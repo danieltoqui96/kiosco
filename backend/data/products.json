@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "barcode": "7801234567890",
+    "name": "Bebida Cola 500ml",
+    "brand": "Coca-Cola",
+    "salePrice": 1200,
+    "purchasePrice": 780,
+    "stock": 24,
+    "category": "Bebidas"
+  },
+  {
+    "id": 2,
+    "barcode": "7809876543210",
+    "name": "Papas Fritas Corte Liso 150g",
+    "brand": "Lays",
+    "salePrice": 1800,
+    "purchasePrice": 1250,
+    "stock": 15,
+    "category": "Snacks"
+  },
+  {
+    "id": 3,
+    "barcode": "7804561237894",
+    "name": "Chocolate Milk 35g",
+    "brand": "Costa",
+    "salePrice": 700,
+    "purchasePrice": 420,
+    "stock": 40,
+    "category": "Dulces"
+  },
+  {
+    "id": 4,
+    "barcode": "7807418529630",
+    "name": "Agua Mineral Sin Gas 600ml",
+    "brand": "Cachantun",
+    "salePrice": 1000,
+    "purchasePrice": 630,
+    "stock": 30,
+    "category": "Bebidas"
+  },
+  {
+    "id": 5,
+    "barcode": "7803692581470",
+    "name": "Galletas Chocolate 126g",
+    "brand": "Oreo",
+    "salePrice": 1500,
+    "purchasePrice": 980,
+    "stock": 18,
+    "category": "Galletas"
+  },
+  {
+    "id": 6,
+    "barcode": "7801234512345",
+    "name": "Bebida Pepsi 500ml",
+    "brand": "Pepsi",
+    "salePrice": 1100,
+    "purchasePrice": 750,
+    "stock": 20,
+    "category": "Bebidas"
+  }
+]
