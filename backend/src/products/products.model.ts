@@ -1,82 +1,67 @@
+import { createPool } from 'mysql2/promise.js';
 import type { Product } from './products.types.js';
+import 'dotenv/config';
 
-const products: Product[] = [
-  {
-    id: 1,
-    barcode: '7801234567890',
-    name: 'Bebida Cola 500ml',
-    brand: 'Coca-Cola',
-    category: 'Bebidas',
-    salePrice: 1200,
-    purchasePrice: 800,
-    stock: 20,
-  },
-  {
-    id: 2,
-    barcode: '7801234567891',
-    name: 'Papas Fritas 150g',
-    brand: 'Lays',
-    category: 'Snacks',
-    salePrice: 1800,
-    purchasePrice: 1200,
-    stock: 15,
-  },
-];
+const config = {
+  host: process.env.MYSQL_HOST || 'localhost',
+  user: process.env.MYSQL_USER || '',
+  port: Number(process.env.MYSQL_PORT) || 3306,
+  password: process.env.MYSQL_PASSWORD || '',
+  database: process.env.MYSQL_DATABASE || 'kiosco',
+};
+
+console.log(config);
+
+const pool = createPool(config);
 
 export class ProductsModel {
   // Obtener todos los productos
-  static getAllProducts(): Product[] {
-    return products;
+  static async getAllProducts(): Promise<Product[]> {
+    const [products] = await pool.query('SELECT * FROM products');
+    return products as Product[];
   }
 
   // Obtener producto por ID
-  static getProductById(id: number): Product {
-    const product = products.find((product) => product.id === id);
+  static async getProductById(id: number): Promise<Product> {
+    const [product] = await pool.query('SELECT * FROM products WHERE id = ?', [
+      id,
+    ]);
     if (!product) {
       throw new Error('Producto no encontrado');
     }
-    return product;
+    return product as unknown as Product;
   }
 
   // Agregar un nuevo producto
-  static addProduct(product: Product): Product {
-    // agregar un id único al producto
-    product.id = products.length + 1;
-    products.push(product);
-    return product;
+  static async addProduct(newProduct: Product): Promise<void> {
+    const { barcode, name, brand, category, salePrice, purchasePrice, stock } =
+      newProduct;
+    await pool.query(
+      'INSERT INTO products (barcode, name, brand, category, sale_price, purchase_price, stock) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [barcode, name, brand, category, salePrice, purchasePrice, stock],
+    );
+    return;
   }
 
   // Modificar un producto existente
-  static updateProduct(
+  static async updateProduct(
     id: number,
     updatedProduct: Partial<Omit<Product, 'id'>>,
-  ): Product {
-    const productIndex = products.findIndex((product) => product.id === id);
-    if (productIndex === -1) {
-      throw new Error('Producto no encontrado');
-    }
-    const newProduct = {
-      ...products[productIndex],
-      ...updatedProduct,
-    } as Product;
-
-    products[productIndex] = newProduct;
-    return newProduct;
+  ): Promise<void> {
+    await pool.query('UPDATE products SET ? WHERE id = ?', [
+      updatedProduct,
+      id,
+    ]);
+    return;
   }
 
   // Eliminar un producto
-  static deleteProduct(id: number): Product {
-    const productIndex = products.findIndex((product) => product.id === id);
-    if (productIndex === -1) {
-      throw new Error('Producto no encontrado');
-    }
-    const [deletedProduct] = products.splice(productIndex, 1);
-    return deletedProduct!;
+  static async deleteProduct(id: number): Promise<void> {
+    await pool.query('DELETE FROM products WHERE id = ?', [id]);
+    return;
   }
 }
 
 // tareas
-// - agregar base de datos
 // - obtener productos por categoría
 // - obtener productos por marca
-// - implementar UUID en lugar de un id numérico

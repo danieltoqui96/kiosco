@@ -3,9 +3,9 @@ import { ProductsModel } from './products.model.js';
 
 export class ProductsController {
   // Obtener todos los productos
-  static getAllProducts(req: Request, res: Response) {
+  static async getAllProducts(req: Request, res: Response) {
     try {
-      const products = ProductsModel.getAllProducts();
+      const products = await ProductsModel.getAllProducts();
       res.json({
         msg: 'Productos obtenidos correctamente',
         data: products,
@@ -19,10 +19,10 @@ export class ProductsController {
   }
 
   // Obtener producto por ID
-  static getProductById(req: Request, res: Response) {
+  static async getProductById(req: Request, res: Response) {
     try {
       const id = Number(req.params.id);
-      const product = ProductsModel.getProductById(id);
+      const product = await ProductsModel.getProductById(id);
       res.json({
         msg: 'Producto obtenido correctamente',
         data: product,
@@ -36,13 +36,12 @@ export class ProductsController {
   }
 
   // Agregar un nuevo producto
-  static addProduct(req: Request, res: Response) {
+  static async addProduct(req: Request, res: Response) {
     try {
       const product = req.body;
-      const newProduct = ProductsModel.addProduct(product);
+      await ProductsModel.addProduct(product);
       res.status(201).json({
         msg: 'Producto agregado correctamente',
-        data: newProduct,
       });
     } catch (error) {
       res.status(500).json({
@@ -53,11 +52,11 @@ export class ProductsController {
   }
 
   // Modificar un producto existente
-  static updateProduct(req: Request, res: Response) {
+  static async updateProduct(req: Request, res: Response) {
     try {
       const id = Number(req.params.id);
       const updatedProduct = req.body;
-      const product = ProductsModel.updateProduct(id, updatedProduct);
+      const product = await ProductsModel.updateProduct(id, updatedProduct);
       res.json({
         msg: 'Producto modificado correctamente',
         data: product,
@@ -71,10 +70,10 @@ export class ProductsController {
   }
 
   // Eliminar un producto
-  static deleteProduct(req: Request, res: Response) {
+  static async deleteProduct(req: Request, res: Response) {
     try {
       const id = Number(req.params.id);
-      const deletedProduct = ProductsModel.deleteProduct(id);
+      const deletedProduct = await ProductsModel.deleteProduct(id);
       res.json({
         msg: 'Producto eliminado correctamente',
         data: deletedProduct,
