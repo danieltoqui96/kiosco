@@ -1,9 +1,5 @@
-import type { ResultSetHeader } from 'mysql2';
 import { pool } from '../db/mysql.js';
-import {
-  mapProductDBToProduct,
-  mapProductToProductDB,
-} from '../utils/product.mapper.js';
+import type { ResultSetHeader } from 'mysql2';
 import type {
   CreateProduct,
   Product,
@@ -11,6 +7,10 @@ import type {
 } from './products.schema.js';
 import type { ProductDB } from './products.types.js';
 import { removeUndefined } from '../utils/object.utils.js';
+import {
+  mapProductDBToProduct,
+  mapProductToProductDB,
+} from '../utils/product.mapper.js';
 
 export class ProductsModel {
   // Obtener todos los productos
@@ -41,14 +41,11 @@ export class ProductsModel {
     // ajustamos el objeto para que solo incluya las propiedades definidas
     const mapData = mapProductToProductDB(data);
 
-    console.log({ mapData });
     // insertamos el producto en la base de datos
     const [result] = await pool.query<ResultSetHeader>(
       `INSERT INTO products SET ?`,
       [mapData],
     );
-
-    console.log({ result });
 
     // obtenemos el producto insertado por su ID y lo retornamos
     const product = await this.getProductById(result.insertId);
@@ -92,9 +89,22 @@ export class ProductsModel {
     if (result.affectedRows === 0) return null;
     return product;
   }
+
+  // Obtenemos producto por código de barras
+  static async getProductByCodebar(codebar: string): Promise<Product | null> {
+    // obtenemos el producto de la base de datos por su código de barras
+    const [productRows] = await pool.query<ProductDB[]>(
+      'SELECT * FROM products WHERE codebar = ?',
+      [codebar],
+    );
+
+    // obtenemos el producto y lo retornamos mapeado al formato de la aplicación
+    const productRow = productRows[0];
+    if (!productRow || productRow.length === 0) return null;
+    return mapProductDBToProduct(productRow);
+  }
 }
 
 // tareas
-// - obtener productos por codebar
 // - obtener productos por categoría
 // - obtener productos por marca

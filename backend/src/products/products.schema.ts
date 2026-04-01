@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const baseProductSchema = z.object({
-  barcode: z.string().min(1),
+  codebar: z.string().min(1),
   name: z.string().min(1),
   brand: z.string().min(1),
   category: z.string().min(1),

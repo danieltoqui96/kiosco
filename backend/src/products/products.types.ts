@@ -2,7 +2,7 @@ import type { RowDataPacket } from 'mysql2';
 
 export interface ProductDB extends RowDataPacket {
   id: number;
-  barcode: string;
+  codebar: string;
   name: string;
   brand: string;
   category: string;

@@ -39,13 +39,7 @@ export class ProductsController {
       // validar los datos del body con Zod
       const z = createProductSchema.safeParse(req.body);
       if (!z.success)
-        return sendResponse(
-          res,
-          false,
-          400,
-          z.error.format(),
-          'Datos inválidos',
-        );
+        return sendResponse(res, false, 400, z.error.issues, 'Datos inválidos');
 
       // agregamos el producto a la base de datos y lo retornamos
       const product = await ProductsModel.addProduct(z.data);
@@ -69,13 +63,7 @@ export class ProductsController {
       // validamos los datos del body con Zod
       const z = updateProductSchema.safeParse(req.body);
       if (!z.success)
-        return sendResponse(
-          res,
-          false,
-          400,
-          z.error.format(),
-          'Datos inválidos',
-        );
+        return sendResponse(res, false, 400, z.error.issues, 'Datos inválidos');
 
       // validamos que se haya enviado al menos un campo para actualizar
       if (Object.keys(z.data).length === 0)
@@ -116,6 +104,30 @@ export class ProductsController {
       sendResponse(res, true, 200, product, 'Producto eliminado correctamente');
     } catch (error) {
       sendResponse(res, false, 500, null, 'Error al eliminar el producto');
+    }
+  }
+
+  // Obtenemos producto por código de barras
+
+  static async getProductByCodebar(req: Request, res: Response) {
+    try {
+      // validar que el código de barras sea una cadena no vacía
+      const codebarParam = req.params.codebar;
+      const codebar = Array.isArray(codebarParam)
+        ? codebarParam[0]
+        : codebarParam;
+
+      if (!codebar || codebar.trim().length === 0)
+        return sendResponse(res, false, 400, null, 'Código de barras inválido');
+
+      // obtenemos el producto por su código de barras y lo retornamos
+      const product = await ProductsModel.getProductByCodebar(codebar);
+      if (!product)
+        return sendResponse(res, false, 404, null, 'Producto no encontrado');
+
+      sendResponse(res, true, 200, product, 'Producto obtenido correctamente');
+    } catch (error) {
+      sendResponse(res, false, 500, null, 'Error al obtener el producto');
     }
   }
 }

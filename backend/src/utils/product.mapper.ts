@@ -4,7 +4,7 @@ import type { ProductDB } from '../products/products.types.js';
 export function mapProductDBToProduct(product: ProductDB): Product {
   return {
     id: product.id,
-    barcode: product.barcode,
+    codebar: product.codebar,
     name: product.name,
     brand: product.brand,
     category: product.category,
@@ -17,7 +17,7 @@ export function mapProductToProductDB(
   product: UpdateProduct,
 ): Partial<Omit<ProductDB, 'id'>> {
   return {
-    barcode: product.barcode,
+    codebar: product.codebar,
     name: product.name,
     brand: product.brand,
     category: product.category,
