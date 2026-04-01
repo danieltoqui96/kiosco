@@ -1,104 +1,100 @@
-import { createPool } from 'mysql2/promise.js';
+import type { ResultSetHeader } from 'mysql2';
+import { pool } from '../db/mysql.js';
+import {
+  mapProductDBToProduct,
+  mapProductToProductDB,
+} from '../utils/product.mapper.js';
 import type {
   CreateProduct,
   Product,
   UpdateProduct,
 } from './products.schema.js';
-import 'dotenv/config';
-
-const config = {
-  host: process.env.MYSQL_HOST || 'localhost',
-  user: process.env.MYSQL_USER || '',
-  port: Number(process.env.MYSQL_PORT) || 3306,
-  password: process.env.MYSQL_PASSWORD || '',
-  database: process.env.MYSQL_DATABASE || 'kiosco',
-};
-
-const pool = createPool(config);
-
-function mapProductFromDB(row: any): Product {
-  return {
-    id: row.id,
-    barcode: row.barcode,
-    name: row.name,
-    brand: row.brand,
-    category: row.category,
-    salePrice: row.sale_price,
-    purchasePrice: row.purchase_price,
-    stock: row.stock,
-  };
-}
+import type { ProductDB } from './products.types.js';
+import { removeUndefined } from '../utils/object.utils.js';
 
 export class ProductsModel {
   // Obtener todos los productos
   static async getAllProducts(): Promise<Product[]> {
-    const [rows] = await pool.query('SELECT * FROM products');
-    return (rows as any[]).map(mapProductFromDB);
+    // obtenemos todos los productos de la base de datos y los retornamos mapeados al formato de la aplicación
+    const [productRows] = await pool.query<ProductDB[]>(
+      'SELECT * FROM products',
+    );
+    return productRows.map(mapProductDBToProduct);
   }
 
   // Obtener producto por ID
-  static async getProductById(productId: number): Promise<Product | null> {
-    const [rows] = (await pool.query('SELECT * FROM products WHERE id = ?', [
-      productId,
-    ])) as [any[], any];
+  static async getProductById(id: number): Promise<Product | null> {
+    // obtenemos el producto de la base de datos por su ID
+    const [productRows] = await pool.query<ProductDB[]>(
+      'SELECT * FROM products WHERE id = ?',
+      [id],
+    );
 
-    if (rows.length === 0) return null;
-
-    return mapProductFromDB(rows[0]);
+    // obtenemos el producto y lo retornamos mapeado al formato de la aplicación
+    const productRow = productRows[0];
+    if (!productRow || productRow.length === 0) return null;
+    return mapProductDBToProduct(productRow);
   }
 
   // Agregar un nuevo producto
-  static async addProduct(productData: CreateProduct): Promise<number> {
-    const { barcode, name, brand, category, salePrice, purchasePrice, stock } =
-      productData;
-    const [result] = (await pool.query(
-      'INSERT INTO products (barcode, name, brand, category, sale_price, purchase_price, stock) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [barcode, name, brand, category, salePrice, purchasePrice, stock],
-    )) as any;
+  static async addProduct(data: CreateProduct): Promise<Product | null> {
+    // ajustamos el objeto para que solo incluya las propiedades definidas
+    const mapData = mapProductToProductDB(data);
 
-    return result.insertId;
+    console.log({ mapData });
+    // insertamos el producto en la base de datos
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO products SET ?`,
+      [mapData],
+    );
+
+    console.log({ result });
+
+    // obtenemos el producto insertado por su ID y lo retornamos
+    const product = await this.getProductById(result.insertId);
+    if (!product) return null;
+    return product;
   }
 
   // Modificar un producto existente
   static async updateProduct(
-    productId: number,
-    productData: UpdateProduct,
-  ): Promise<boolean> {
-    const { barcode, name, brand, category, salePrice, purchasePrice, stock } =
-      productData;
+    id: number,
+    data: UpdateProduct,
+  ): Promise<Product | null> {
+    // ajustamos el objeto para que solo incluya las propiedades definidas
+    const mapData = mapProductToProductDB(data);
+    const cleanData = removeUndefined(mapData);
 
-    const dbProductData: Record<string, string | number> = {};
+    // actualizamos el producto en la base de datos
+    const [result] = await pool.query<ResultSetHeader>(
+      'UPDATE products SET ? WHERE id = ?',
+      [cleanData, id],
+    );
+    if (result.affectedRows === 0) return null;
 
-    if (barcode !== undefined) dbProductData.barcode = barcode;
-    if (name !== undefined) dbProductData.name = name;
-    if (brand !== undefined) dbProductData.brand = brand;
-    if (category !== undefined) dbProductData.category = category;
-    if (salePrice !== undefined) dbProductData.sale_price = salePrice;
-    if (purchasePrice !== undefined)
-      dbProductData.purchase_price = purchasePrice;
-    if (stock !== undefined) dbProductData.stock = stock;
-
-    const [result] = (await pool.query('UPDATE products SET ? WHERE id = ?', [
-      dbProductData,
-      productId,
-    ])) as any;
-
-    if (result.affectedRows === 0) return false;
-
-    return true;
+    // obtenemos el producto actualizado por su ID y lo retornamos
+    const product = await this.getProductById(id);
+    if (!product) return null;
+    return product!;
   }
 
   // Eliminar un producto
-  static async deleteProduct(productId: number): Promise<boolean> {
-    const [result] = (await pool.query('DELETE FROM products WHERE id = ?', [
-      productId,
-    ])) as any;
-    if (result.affectedRows === 0) return false;
-    else return true;
+  static async deleteProduct(id: number): Promise<Product | null> {
+    // obtenemos el producto antes de eliminarlo para poder retornarlo después
+    const product = await this.getProductById(id);
+    if (!product) return null;
+
+    // eliminamos el producto de la base de datos y retornamos el producto eliminado
+    const [result] = await pool.query<ResultSetHeader>(
+      'DELETE FROM products WHERE id = ?',
+      [id],
+    );
+    if (result.affectedRows === 0) return null;
+    return product;
   }
 }
 
 // tareas
-// validar datos que vienen del body con zod
+// - obtener productos por codebar
 // - obtener productos por categoría
 // - obtener productos por marca
