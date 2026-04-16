@@ -6,12 +6,12 @@ export function mapProductDBToProduct(product: ProductDB): Product {
     id: product.id,
     codebar: product.codebar,
     name: product.name,
-    brand: product.brand,
-    category: product.category,
+    brandId: product.brand_id,
+    categoryId: product.category_id,
     salePrice: product.sale_price,
     purchasePrice: product.purchase_price,
     stock: product.stock,
-    status: product.status,
+    isActive: product.is_active,
   };
 }
 
@@ -21,11 +21,11 @@ export function mapProductToProductDB(
   return {
     codebar: product.codebar,
     name: product.name,
-    brand: product.brand,
-    category: product.category,
+    brand_id: product.brandId,
+    category_id: product.categoryId,
     sale_price: product.salePrice,
     purchase_price: product.purchasePrice,
     stock: product.stock,
-    status: product.status,
+    is_active: product.isActive,
   };
 }

@@ -4,10 +4,10 @@ export interface ProductDB extends RowDataPacket {
   id: number;
   codebar: string;
   name: string;
-  brand: string;
-  category: string;
+  brand_id: number;
+  category_id: number;
   sale_price: number;
   purchase_price: number;
   stock: number;
-  status: boolean;
+  is_active: boolean;
 }

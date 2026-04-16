@@ -3,12 +3,12 @@ import { z } from 'zod';
 const baseProductSchema = z.object({
   codebar: z.string().min(1),
   name: z.string().min(1),
-  brand: z.string().min(1),
-  category: z.string().min(1),
-  salePrice: z.number().positive(),
-  purchasePrice: z.number().positive(),
+  brandId: z.number().int().positive(),
+  categoryId: z.number().int().positive(),
+  salePrice: z.number().int().nonnegative(),
+  purchasePrice: z.number().int().nonnegative(),
   stock: z.number().int().nonnegative(),
-  status: z.boolean(),
+  isActive: z.boolean(),
 });
 
 export const productSchema = baseProductSchema.extend({
