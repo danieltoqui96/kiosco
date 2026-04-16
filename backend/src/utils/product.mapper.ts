@@ -10,6 +10,8 @@ export function mapProductDBToProduct(product: ProductDB): Product {
     category: product.category,
     salePrice: product.sale_price,
     purchasePrice: product.purchase_price,
+    stock: product.stock,
+    status: product.status,
   };
 }
 
@@ -23,5 +25,7 @@ export function mapProductToProductDB(
     category: product.category,
     sale_price: product.salePrice,
     purchase_price: product.purchasePrice,
+    stock: product.stock,
+    status: product.status,
   };
 }

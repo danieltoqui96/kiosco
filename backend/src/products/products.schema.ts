@@ -7,6 +7,8 @@ const baseProductSchema = z.object({
   category: z.string().min(1),
   salePrice: z.number().positive(),
   purchasePrice: z.number().positive(),
+  stock: z.number().int().nonnegative(),
+  status: z.boolean(),
 });
 
 export const productSchema = baseProductSchema.extend({

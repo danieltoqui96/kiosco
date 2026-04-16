@@ -9,4 +9,5 @@ export interface ProductDB extends RowDataPacket {
   sale_price: number;
   purchase_price: number;
   stock: number;
+  status: boolean;
 }
