@@ -53,7 +53,13 @@ Regla de trabajo activa: pedir aprobacion antes de cada cambio.
 Se renombro `status` a `isActive` (mapeado con `is_active` en DB) y se actualizaron validaciones y mapeos.
 **Validacion:** `npm.cmd run build` OK.
 
+### Cambio 4 - Endpoints CRUD de brands
+**Fecha:** 2026-04-16  
+**Resumen:** Se creo el modulo completo `brands` (schema, types, model, controller y router) con CRUD:
+`GET /brands`, `GET /brands/:id`, `POST /brands`, `PUT /brands/:id`, `DELETE /brands/:id`.  
+Tambien se integro el router en `app.ts`.
+**Validacion:** `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Cambio 4: Crear endpoints de `brands`.
 - Cambio 5: Crear endpoints de `categories`.
 - Cambio 6: Agregar CORS.
