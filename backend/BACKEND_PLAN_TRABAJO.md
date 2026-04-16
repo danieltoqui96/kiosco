@@ -60,6 +60,12 @@ Se renombro `status` a `isActive` (mapeado con `is_active` en DB) y se actualiza
 Tambien se integro el router en `app.ts`.
 **Validacion:** `npm.cmd run build` OK.
 
+### Cambio 5 - Endpoints CRUD de categories
+**Fecha:** 2026-04-16  
+**Resumen:** Se creo el modulo completo `categories` (schema, types, model, controller y router) con CRUD:
+`GET /categories`, `GET /categories/:id`, `POST /categories`, `PUT /categories/:id`, `DELETE /categories/:id`.  
+Tambien se integro el router en `app.ts`.
+**Validacion:** `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Cambio 5: Crear endpoints de `categories`.
 - Cambio 6: Agregar CORS.
