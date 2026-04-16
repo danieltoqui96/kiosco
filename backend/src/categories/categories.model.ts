@@ -23,6 +23,63 @@ export class CategoriesModel {
     return rows[0] ?? null;
   }
 
+  static async getCategoryByNameExact(name: string): Promise<Category> {
+    try {
+      const [rows] = await pool.query<CategoryDB[]>(
+        'SELECT * FROM categories WHERE name = ?',
+        [name],
+      );
+      const category = rows[0] ?? null;
+      if (!category) {
+        throw {
+          message: 'Categoria no encontrada',
+          code: 404,
+        };
+      }
+      return category;
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        'message' in error
+      ) {
+        throw error;
+      }
+      throw {
+        message: 'Error al buscar la categoria por nombre',
+        code: 500,
+      };
+    }
+  }
+
+  static async getOrCreateCategoryByName(name: string): Promise<Category> {
+    try {
+      return await this.getCategoryByNameExact(name);
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: number }).code === 404
+      ) {
+        const created = await this.addCategory({ name });
+        if (!created) {
+          throw {
+            message: 'No se pudo crear la categoria',
+            code: 500,
+          };
+        }
+        return created;
+      }
+
+      throw {
+        message: 'Error al consultar o crear la categoria',
+        code: 500,
+      };
+    }
+  }
+
   static async addCategory(data: CreateCategory): Promise<Category | null> {
     const [result] = await pool.query<ResultSetHeader>(
       'INSERT INTO categories (name) VALUES (?)',

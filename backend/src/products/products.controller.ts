@@ -1,10 +1,28 @@
 import type { Request, Response } from 'express';
-import { ProductsModel } from './products.model.js';
-import { createProductSchema, updateProductSchema } from './products.schema.js';
 import { sendResponse } from '../utils/responses.js';
+import { createProductSchema, updateProductSchema } from './products.schema.js';
+import { ProductsModel } from './products.model.js';
 
 export class ProductsController {
-  // Obtener todos los productos
+  private static handleModelError(
+    res: Response,
+    error: unknown,
+    fallbackMessage: string,
+  ) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof (error as { code?: unknown }).code === 'number' &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      const typedError = error as { code: number; message: string };
+      return sendResponse(res, false, typedError.code, null, typedError.message);
+    }
+    return sendResponse(res, false, 500, null, fallbackMessage);
+  }
+
   static async getAllProducts(req: Request, res: Response) {
     try {
       const products = await ProductsModel.getAllProducts();
@@ -14,18 +32,17 @@ export class ProductsController {
     }
   }
 
-  // Obtener producto por ID
   static async getProductById(req: Request, res: Response) {
     try {
-      // validar que el ID sea un número entero positivo
       const id = Number(req.params.id);
-      if (Number.isNaN(id) || id <= 0)
-        return sendResponse(res, false, 400, null, 'ID de producto inválido');
+      if (Number.isNaN(id) || id <= 0) {
+        return sendResponse(res, false, 400, null, 'ID de producto invalido');
+      }
 
-      // obtenemos el producto por su ID y lo retornamos
       const product = await ProductsModel.getProductById(id);
-      if (!product)
+      if (!product) {
         return sendResponse(res, false, 404, null, 'Producto no encontrado');
+      }
 
       sendResponse(res, true, 200, product, 'Producto obtenido correctamente');
     } catch (error) {
@@ -33,69 +50,86 @@ export class ProductsController {
     }
   }
 
-  // Agregar un nuevo producto
   static async addProduct(req: Request, res: Response) {
     try {
-      // validar los datos del body con Zod
-      const z = createProductSchema.safeParse(req.body);
-      if (!z.success)
-        return sendResponse(res, false, 400, z.error.issues, 'Datos inválidos');
+      const parsed = createProductSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return sendResponse(
+          res,
+          false,
+          400,
+          parsed.error.issues,
+          'Datos invalidos',
+        );
+      }
 
-      // agregamos el producto a la base de datos y lo retornamos
-      const product = await ProductsModel.addProduct(z.data);
-      if (!product)
-        return sendResponse(res, false, 500, null, 'Producto no encontrado');
+      const product = await ProductsModel.addProduct(parsed.data);
+      if (!product) {
+        return sendResponse(
+          res,
+          false,
+          500,
+          null,
+          'No se pudo crear el producto',
+        );
+      }
 
       sendResponse(res, true, 201, product, 'Producto agregado correctamente');
     } catch (error) {
-      sendResponse(res, false, 500, null, 'Error al agregar el producto');
+      return this.handleModelError(res, error, 'Error al agregar el producto');
     }
   }
 
-  // Modificar un producto existente
   static async updateProduct(req: Request, res: Response) {
     try {
-      // validar que el ID sea un número entero positivo
       const id = Number(req.params.id);
-      if (Number.isNaN(id) || id <= 0)
-        return sendResponse(res, false, 400, null, 'ID de producto inválido');
+      if (Number.isNaN(id) || id <= 0) {
+        return sendResponse(res, false, 400, null, 'ID de producto invalido');
+      }
 
-      // validamos los datos del body con Zod
-      const z = updateProductSchema.safeParse(req.body);
-      if (!z.success)
-        return sendResponse(res, false, 400, z.error.issues, 'Datos inválidos');
+      const parsed = updateProductSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return sendResponse(
+          res,
+          false,
+          400,
+          parsed.error.issues,
+          'Datos invalidos',
+        );
+      }
 
-      // validamos que se haya enviado al menos un campo para actualizar
-      if (Object.keys(z.data).length === 0)
+      if (Object.keys(parsed.data).length === 0) {
         return sendResponse(
           res,
           false,
           400,
           null,
-          'enviar al menos un campo valido',
+          'Enviar al menos un campo valido',
         );
+      }
 
-      // modificamos el producto en la base de datos y lo retornamos
-      const product = await ProductsModel.updateProduct(id, z.data);
-      if (!product)
+      const product = await ProductsModel.updateProduct(id, parsed.data);
+      if (!product) {
         return sendResponse(res, false, 404, null, 'Producto no encontrado');
+      }
 
-      sendResponse(res, true, 200, product, 'Producto modificado con éxito');
+      sendResponse(res, true, 200, product, 'Producto modificado con exito');
     } catch (error) {
-      sendResponse(res, false, 500, null, 'Error al modificar el producto');
+      return this.handleModelError(
+        res,
+        error,
+        'Error al modificar el producto',
+      );
     }
   }
 
-  // Eliminar un producto
   static async deleteProduct(req: Request, res: Response) {
     try {
-      // validamos que el ID sea un número entero positivo
       const id = Number(req.params.id);
       if (Number.isNaN(id) || id <= 0) {
-        return sendResponse(res, false, 400, null, 'ID de producto inválido');
+        return sendResponse(res, false, 400, null, 'ID de producto invalido');
       }
 
-      // obtenemos el producto eliminado por su ID y lo retornamos
       const product = await ProductsModel.deleteProduct(id);
       if (!product) {
         return sendResponse(res, false, 404, null, 'Producto no encontrado');
@@ -107,23 +141,21 @@ export class ProductsController {
     }
   }
 
-  // Obtenemos producto por código de barras
-
   static async getProductByCodebar(req: Request, res: Response) {
     try {
-      // validar que el código de barras sea una cadena no vacía
       const codebarParam = req.params.codebar;
       const codebar = Array.isArray(codebarParam)
         ? codebarParam[0]
         : codebarParam;
 
-      if (!codebar || codebar.trim().length === 0)
-        return sendResponse(res, false, 400, null, 'Código de barras inválido');
+      if (!codebar || codebar.trim().length === 0) {
+        return sendResponse(res, false, 400, null, 'Codigo de barras invalido');
+      }
 
-      // obtenemos el producto por su código de barras y lo retornamos
       const product = await ProductsModel.getProductByCodebar(codebar);
-      if (!product)
+      if (!product) {
         return sendResponse(res, false, 404, null, 'Producto no encontrado');
+      }
 
       sendResponse(res, true, 200, product, 'Producto obtenido correctamente');
     } catch (error) {

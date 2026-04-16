@@ -7,6 +7,21 @@ import {
 } from './categories.schema.js';
 
 export class CategoriesController {
+  private static handleError(res: Response, error: unknown, fallbackMessage: string) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof (error as { code?: unknown }).code === 'number' &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      const typedError = error as { code: number; message: string };
+      return sendResponse(res, false, typedError.code, null, typedError.message);
+    }
+    return sendResponse(res, false, 500, null, fallbackMessage);
+  }
+
   static async getAllCategories(req: Request, res: Response) {
     try {
       const categories = await CategoriesModel.getAllCategories();
@@ -31,6 +46,22 @@ export class CategoriesController {
       sendResponse(res, true, 200, category, 'Categoria obtenida correctamente');
     } catch (error) {
       sendResponse(res, false, 500, null, 'Error al obtener categoria');
+    }
+  }
+
+  static async getCategoryByNameExact(req: Request, res: Response) {
+    try {
+      const nameParam = req.params.name;
+      const name = Array.isArray(nameParam) ? nameParam[0] : nameParam;
+      const normalizedName = name?.trim();
+      if (!normalizedName) {
+        return sendResponse(res, false, 400, null, 'Nombre de categoria invalido');
+      }
+
+      const category = await CategoriesModel.getCategoryByNameExact(normalizedName);
+      sendResponse(res, true, 200, category, 'Categoria obtenida correctamente');
+    } catch (error) {
+      return this.handleError(res, error, 'Error al buscar categoria por nombre');
     }
   }
 

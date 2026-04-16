@@ -67,5 +67,61 @@ Tambien se integro el router en `app.ts`.
 Tambien se integro el router en `app.ts`.
 **Validacion:** `npm.cmd run build` OK.
 
+### Cambio 6 - Ajuste de queries de products para esquema relacional
+**Fecha:** 2026-04-16  
+**Resumen:** Se actualizaron las queries de `products` para trabajar correctamente con `brand_id`, `category_id` e `is_active`, incluyendo `JOIN` con `brands` y `categories` en lecturas.  
+Se agrego validacion previa de referencias (`brandId`, `categoryId`) en create/update para responder error controlado si la referencia no existe.  
+Tambien se corrigio el orden de rutas para que `GET /products/codebar/:codebar` no choque con `GET /products/:id`.
+**Validacion:** `npm.cmd run build` OK.
+
+### Cambio 7 - Products responde marca y categoria por nombre
+**Fecha:** 2026-04-16  
+**Resumen:** Se ajusto el contrato de salida de `products` para devolver `brand` y `category` (nombre) en lugar de `brandId` y `categoryId`.  
+Se separo esquema de lectura y escritura: create/update siguen recibiendo IDs, pero las respuestas del API exponen solo nombres de marca/categoria junto a los demas campos de producto.
+**Validacion:** `npm.cmd run build` OK.
+
+### Cambio 8 - Validacion de referencias dentro de add/update en products
+**Fecha:** 2026-04-16  
+**Resumen:** Se elimino el enfoque de error/clase dedicada para referencias y la validacion quedo embebida directamente en `addProduct` y `updateProduct`.  
+Tambien se ajusto `products.controller.ts` para devolver 400 cuando `brandId` o `categoryId` no existen, usando mensajes claros y manteniendo el flujo simple.
+**Validacion:** `npm.cmd run build` OK.
+
+### Cambio 9 - Eliminacion de `IdRow` en products.model
+**Fecha:** 2026-04-16  
+**Resumen:** Se retiro la interfaz `IdRow` y se dejo validacion de referencias con tipado inline en las queries (`RowDataPacket & { id: number }`), manteniendo el mismo comportamiento.
+**Validacion:** `npm.cmd run build` OK.
+
+### Cambio 10 - addProduct con find-or-create de brand y category
+**Fecha:** 2026-04-16  
+**Resumen:** Se ajusto `addProduct` para buscar `brand` por nombre y crearla si no existe; luego hacer lo mismo con `category`; y finalmente crear el producto con los IDs resultantes.  
+Se agrego manejo de errores separado para las tres operaciones a base de datos: marca, categoria y producto.
+**Validacion:** `npm.cmd run build` OK.
+
+### Cambio 11 - updateProduct con find-or-create de brand y category
+**Fecha:** 2026-04-16  
+**Resumen:** Se ajusto `updateProduct` para que, si llegan `brand` y/o `category` por nombre, haga find-or-create y actualice internamente `brand_id` y `category_id`.  
+Si esos campos no llegan en el body, no se tocan las relaciones. Se agrego manejo de errores separado para operacion de marca, categoria y actualizacion de producto.
+**Validacion:** `npm.cmd run build` OK.
+
+### Cambio 12 - Centralizacion de errores de products en el modelo
+**Fecha:** 2026-04-16  
+**Resumen:** Se agrego `AppError` reutilizable y el modelo de `products` ahora lanza errores con mensaje final para cada fallo de DB, evitando codigos de error internos.  
+El controller se simplifico con un unico helper de manejo de errores y se elimino repeticion de condicionales por mensaje.
+**Validacion:** `npm.cmd run build` OK.
+
+### Cambio 13 - Reemplazo de AppError clase por funciones
+**Fecha:** 2026-04-16  
+**Resumen:** Se reemplazo la clase `AppError` por utilidades funcionales (`createAppError` e `isAppError`) para mantener el mismo comportamiento con un enfoque mas simple.  
+El modelo y controller de `products` fueron actualizados para usar estas funciones.
+**Validacion:** `npm.cmd run build` OK.
+
+### Cambio 14 - Busqueda exacta por nombre y manejo de errores con `code`
+**Fecha:** 2026-04-16  
+**Resumen:** Se agregaron endpoints de busqueda exacta por nombre:
+`GET /brands/name/:name` y `GET /categories/name/:name`.  
+Los modelos de `brands` y `categories` ahora lanzan errores con formato `{ message, code }` cuando no encuentran registro o falla una operacion.
+`products.model` reutiliza estas funciones para hacer find-or-create en add/update y los controladores manejan errores con un solo `if (error.code)`.
+**Validacion:** `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Cambio 6: Agregar CORS.
+- Cambio 15: Agregar CORS.

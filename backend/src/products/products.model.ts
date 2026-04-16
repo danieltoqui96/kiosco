@@ -1,87 +1,185 @@
 import { pool } from '../db/mysql.js';
 import type { ResultSetHeader } from 'mysql2';
+import { BrandsModel } from '../brands/brands.model.js';
+import { CategoriesModel } from '../categories/categories.model.js';
 import type {
   CreateProduct,
   Product,
   UpdateProduct,
 } from './products.schema.js';
-import type { ProductDB } from './products.types.js';
+import type { ProductReadDB } from './products.types.js';
 import { removeUndefined } from '../utils/object.utils.js';
 import {
   mapProductDBToProduct,
   mapProductToProductDB,
 } from '../utils/product.mapper.js';
 
+function isErrorWithCode(error: unknown): error is { message: string; code: number } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'number' &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  );
+}
+
 export class ProductsModel {
-  // Obtener todos los productos
   static async getAllProducts(): Promise<Product[]> {
-    // obtenemos todos los productos de la base de datos y los retornamos mapeados al formato de la aplicación
-    const [productRows] = await pool.query<ProductDB[]>(
-      'SELECT * FROM products',
+    const [productRows] = await pool.query<ProductReadDB[]>(
+      `
+        SELECT
+          p.id,
+          p.codebar,
+          p.name,
+          b.name AS brand,
+          c.name AS category,
+          p.sale_price,
+          p.purchase_price,
+          p.stock,
+          p.is_active
+        FROM products p
+        INNER JOIN brands b ON b.id = p.brand_id
+        INNER JOIN categories c ON c.id = p.category_id
+      `,
     );
     return productRows.map(mapProductDBToProduct);
   }
 
-  // Obtener producto por ID
   static async getProductById(id: number): Promise<Product | null> {
-    // obtenemos el producto de la base de datos por su ID
-    const [productRows] = await pool.query<ProductDB[]>(
-      'SELECT * FROM products WHERE id = ?',
+    const [productRows] = await pool.query<ProductReadDB[]>(
+      `
+        SELECT
+          p.id,
+          p.codebar,
+          p.name,
+          b.name AS brand,
+          c.name AS category,
+          p.sale_price,
+          p.purchase_price,
+          p.stock,
+          p.is_active
+        FROM products p
+        INNER JOIN brands b ON b.id = p.brand_id
+        INNER JOIN categories c ON c.id = p.category_id
+        WHERE p.id = ?
+      `,
       [id],
     );
 
-    // obtenemos el producto y lo retornamos mapeado al formato de la aplicación
     const productRow = productRows[0];
-    if (!productRow || productRow.length === 0) return null;
+    if (!productRow) return null;
     return mapProductDBToProduct(productRow);
   }
 
-  // Agregar un nuevo producto
   static async addProduct(data: CreateProduct): Promise<Product | null> {
-    // ajustamos el objeto para que solo incluya las propiedades definidas
-    const mapData = mapProductToProductDB(data);
+    let brandId: number;
+    try {
+      const brand = await BrandsModel.getOrCreateBrandByName(data.brand);
+      brandId = brand.id;
+    } catch (error) {
+      if (isErrorWithCode(error)) throw error;
+      throw {
+        message: 'Error al consultar o crear la marca',
+        code: 500,
+      };
+    }
 
-    // insertamos el producto en la base de datos
-    const [result] = await pool.query<ResultSetHeader>(
-      `INSERT INTO products SET ?`,
-      [mapData],
-    );
+    let categoryId: number;
+    try {
+      const category = await CategoriesModel.getOrCreateCategoryByName(
+        data.category,
+      );
+      categoryId = category.id;
+    } catch (error) {
+      if (isErrorWithCode(error)) throw error;
+      throw {
+        message: 'Error al consultar o crear la categoria',
+        code: 500,
+      };
+    }
 
-    // obtenemos el producto insertado por su ID y lo retornamos
-    const product = await this.getProductById(result.insertId);
-    if (!product) return null;
-    return product;
+    try {
+      const [result] = await pool.query<ResultSetHeader>(
+        'INSERT INTO products SET ?',
+        [
+          {
+            codebar: data.codebar,
+            name: data.name,
+            brand_id: brandId,
+            category_id: categoryId,
+            sale_price: data.salePrice,
+            purchase_price: data.purchasePrice,
+            stock: data.stock,
+            is_active: data.isActive,
+          },
+        ],
+      );
+
+      return this.getProductById(result.insertId);
+    } catch (error) {
+      throw {
+        message: 'Error al crear el producto',
+        code: 500,
+      };
+    }
   }
 
-  // Modificar un producto existente
   static async updateProduct(
     id: number,
     data: UpdateProduct,
   ): Promise<Product | null> {
-    // ajustamos el objeto para que solo incluya las propiedades definidas
     const mapData = mapProductToProductDB(data);
     const cleanData = removeUndefined(mapData);
 
-    // actualizamos el producto en la base de datos
-    const [result] = await pool.query<ResultSetHeader>(
-      'UPDATE products SET ? WHERE id = ?',
-      [cleanData, id],
-    );
-    if (result.affectedRows === 0) return null;
+    if (data.brand !== undefined) {
+      try {
+        const brand = await BrandsModel.getOrCreateBrandByName(data.brand);
+        cleanData.brand_id = brand.id;
+      } catch (error) {
+        if (isErrorWithCode(error)) throw error;
+        throw {
+          message: 'Error al consultar o crear la marca',
+          code: 500,
+        };
+      }
+    }
 
-    // obtenemos el producto actualizado por su ID y lo retornamos
-    const product = await this.getProductById(id);
-    if (!product) return null;
-    return product!;
+    if (data.category !== undefined) {
+      try {
+        const category = await CategoriesModel.getOrCreateCategoryByName(
+          data.category,
+        );
+        cleanData.category_id = category.id;
+      } catch (error) {
+        if (isErrorWithCode(error)) throw error;
+        throw {
+          message: 'Error al consultar o crear la categoria',
+          code: 500,
+        };
+      }
+    }
+
+    try {
+      const [result] = await pool.query<ResultSetHeader>(
+        'UPDATE products SET ? WHERE id = ?',
+        [cleanData, id],
+      );
+      if (result.affectedRows === 0) return null;
+      return this.getProductById(id);
+    } catch (error) {
+      throw {
+        message: 'Error al actualizar el producto',
+        code: 500,
+      };
+    }
   }
 
-  // Eliminar un producto
   static async deleteProduct(id: number): Promise<Product | null> {
-    // obtenemos el producto antes de eliminarlo para poder retornarlo después
     const product = await this.getProductById(id);
     if (!product) return null;
 
-    // eliminamos el producto de la base de datos y retornamos el producto eliminado
     const [result] = await pool.query<ResultSetHeader>(
       'DELETE FROM products WHERE id = ?',
       [id],
@@ -90,21 +188,29 @@ export class ProductsModel {
     return product;
   }
 
-  // Obtenemos producto por código de barras
   static async getProductByCodebar(codebar: string): Promise<Product | null> {
-    // obtenemos el producto de la base de datos por su código de barras
-    const [productRows] = await pool.query<ProductDB[]>(
-      'SELECT * FROM products WHERE codebar = ?',
+    const [productRows] = await pool.query<ProductReadDB[]>(
+      `
+        SELECT
+          p.id,
+          p.codebar,
+          p.name,
+          b.name AS brand,
+          c.name AS category,
+          p.sale_price,
+          p.purchase_price,
+          p.stock,
+          p.is_active
+        FROM products p
+        INNER JOIN brands b ON b.id = p.brand_id
+        INNER JOIN categories c ON c.id = p.category_id
+        WHERE p.codebar = ?
+      `,
       [codebar],
     );
 
-    // obtenemos el producto y lo retornamos mapeado al formato de la aplicación
     const productRow = productRows[0];
-    if (!productRow || productRow.length === 0) return null;
+    if (!productRow) return null;
     return mapProductDBToProduct(productRow);
   }
 }
-
-// tareas
-// - obtener productos por categoría
-// - obtener productos por marca

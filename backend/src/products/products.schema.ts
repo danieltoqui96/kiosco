@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const baseProductSchema = z.object({
+const baseWriteProductSchema = z.object({
   codebar: z.string().min(1),
   name: z.string().min(1),
   brandId: z.number().int().positive(),
@@ -11,11 +11,30 @@ const baseProductSchema = z.object({
   isActive: z.boolean(),
 });
 
-export const productSchema = baseProductSchema.extend({
-  id: z.number().int().positive(),
+const baseCreateProductSchema = z.object({
+  codebar: z.string().min(1),
+  name: z.string().min(1),
+  brand: z.string().min(1).max(100),
+  category: z.string().min(1).max(100),
+  salePrice: z.number().int().nonnegative(),
+  purchasePrice: z.number().int().nonnegative(),
+  stock: z.number().int().nonnegative(),
+  isActive: z.boolean(),
 });
-export const createProductSchema = baseProductSchema;
-export const updateProductSchema = baseProductSchema.partial();
+
+export const productSchema = z.object({
+  id: z.number().int().positive(),
+  codebar: z.string().min(1),
+  name: z.string().min(1),
+  brand: z.string().min(1),
+  category: z.string().min(1),
+  salePrice: z.number().int().nonnegative(),
+  purchasePrice: z.number().int().nonnegative(),
+  stock: z.number().int().nonnegative(),
+  isActive: z.boolean(),
+});
+export const createProductSchema = baseCreateProductSchema;
+export const updateProductSchema = baseCreateProductSchema.partial();
 
 export type Product = z.infer<typeof productSchema>;
 export type CreateProduct = z.infer<typeof createProductSchema>;
