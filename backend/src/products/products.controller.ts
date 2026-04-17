@@ -5,11 +5,13 @@ import {
   getErrorData,
   getStatusCode,
 } from '../utils/controller-error.utils.js';
+import { getPaginationParams } from '../utils/pagination.utils.js';
 
 export class ProductsController {
   static async getAllProducts(req: Request, res: Response) {
     try {
-      const products = await ProductsModel.getAllProducts();
+      const pagination = getPaginationParams(req.query.page, req.query.limit);
+      const products = await ProductsModel.getAllProducts(pagination);
       return res.success(products, 'Productos obtenidos con exito', 200);
     } catch (error) {
       return res.error('Error al obtener los productos', 500, getErrorData(error));

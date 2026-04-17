@@ -148,5 +148,11 @@ Si `CORS_ORIGINS` esta vacio, se permite cualquier origen; si tiene valores, sol
 Tambien se actualizo `.env.template` con `CORS_ORIGINS=`.
 **Validacion:** `npm.cmd run build` OK.
 
+### Cambio 19 - Paginacion base en endpoints getAll
+**Fecha:** 2026-04-17  
+**Resumen:** Se implemento paginacion en `GET /products`, `GET /brands` y `GET /categories` usando query params `page` y `limit`.  
+Los modelos ahora retornan estructura paginada con `items`, `page`, `limit`, `total` y `totalPages`, y se agrego util compartido `src/utils/pagination.utils.ts`.
+**Validacion:** `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Cambio 19: Mejora de codigo y comentarios.
+- Cambio 20: Filtros en getAll (products y busqueda por nombre en brands/categories).

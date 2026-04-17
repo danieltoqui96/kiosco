@@ -3,13 +3,15 @@ import {
   getErrorData,
   getStatusCode,
 } from '../utils/controller-error.utils.js';
+import { getPaginationParams } from '../utils/pagination.utils.js';
 import { BrandsModel } from './brands.model.js';
 import { createBrandSchema, updateBrandSchema } from './brands.schema.js';
 
 export class BrandsController {
   static async getAllBrands(req: Request, res: Response) {
     try {
-      const brands = await BrandsModel.getAllBrands();
+      const pagination = getPaginationParams(req.query.page, req.query.limit);
+      const brands = await BrandsModel.getAllBrands(pagination);
       return res.success(brands, 'Marcas obtenidas con exito', 200);
     } catch (error) {
       return res.error('Error al obtener marcas', 500, getErrorData(error));

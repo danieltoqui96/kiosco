@@ -1,4 +1,4 @@
-import type { ResultSetHeader } from 'mysql2';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { pool } from '../db/mysql.js';
 import type { CategoryDB } from './categories.types.js';
 import type {
@@ -6,13 +6,36 @@ import type {
   CreateCategory,
   UpdateCategory,
 } from './categories.schema.js';
+import type {
+  PaginatedResult,
+  PaginationParams,
+} from '../utils/pagination.utils.js';
+
+interface CountRow extends RowDataPacket {
+  total: number;
+}
 
 export class CategoriesModel {
-  static async getAllCategories(): Promise<Category[]> {
-    const [rows] = await pool.query<CategoryDB[]>(
-      'SELECT * FROM categories ORDER BY id',
+  static async getAllCategories(
+    pagination: PaginationParams,
+  ): Promise<PaginatedResult<Category>> {
+    const [countRows] = await pool.query<CountRow[]>(
+      'SELECT COUNT(*) AS total FROM categories',
     );
-    return rows;
+    const total = countRows[0]?.total ?? 0;
+
+    const [rows] = await pool.query<CategoryDB[]>(
+      'SELECT * FROM categories ORDER BY id DESC LIMIT ? OFFSET ?',
+      [pagination.limit, pagination.offset],
+    );
+
+    return {
+      items: rows,
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: total === 0 ? 0 : Math.ceil(total / pagination.limit),
+    };
   }
 
   static async getCategoryById(id: number): Promise<Category | null> {

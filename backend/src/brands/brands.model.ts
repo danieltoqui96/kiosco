@@ -1,14 +1,37 @@
-import type { ResultSetHeader } from 'mysql2';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { pool } from '../db/mysql.js';
 import type { BrandDB } from './brands.types.js';
 import type { Brand, CreateBrand, UpdateBrand } from './brands.schema.js';
+import type {
+  PaginatedResult,
+  PaginationParams,
+} from '../utils/pagination.utils.js';
+
+interface CountRow extends RowDataPacket {
+  total: number;
+}
 
 export class BrandsModel {
-  static async getAllBrands(): Promise<Brand[]> {
-    const [rows] = await pool.query<BrandDB[]>(
-      'SELECT * FROM brands ORDER BY id;',
+  static async getAllBrands(
+    pagination: PaginationParams,
+  ): Promise<PaginatedResult<Brand>> {
+    const [countRows] = await pool.query<CountRow[]>(
+      'SELECT COUNT(*) AS total FROM brands',
     );
-    return rows;
+    const total = countRows[0]?.total ?? 0;
+
+    const [rows] = await pool.query<BrandDB[]>(
+      'SELECT * FROM brands ORDER BY id DESC LIMIT ? OFFSET ?',
+      [pagination.limit, pagination.offset],
+    );
+
+    return {
+      items: rows,
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: total === 0 ? 0 : Math.ceil(total / pagination.limit),
+    };
   }
 
   static async getBrandById(id: number): Promise<Brand | null> {

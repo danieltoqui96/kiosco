@@ -1,5 +1,5 @@
 import { pool } from '../db/mysql.js';
-import type { ResultSetHeader } from 'mysql2';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { BrandsModel } from '../brands/brands.model.js';
 import { CategoriesModel } from '../categories/categories.model.js';
 import type {
@@ -8,14 +8,33 @@ import type {
   UpdateProduct,
 } from './products.schema.js';
 import type { ProductReadDB } from './products.types.js';
+import type {
+  PaginatedResult,
+  PaginationParams,
+} from '../utils/pagination.utils.js';
 import { removeUndefined } from '../utils/object.utils.js';
 import {
   mapProductDBToProduct,
   mapProductToProductDB,
 } from '../utils/product.mapper.js';
 
+interface CountRow extends RowDataPacket {
+  total: number;
+}
+
 export class ProductsModel {
-  static async getAllProducts(): Promise<Product[]> {
+  static async getAllProducts(
+    pagination: PaginationParams,
+  ): Promise<PaginatedResult<Product>> {
+    const [countRows] = await pool.query<CountRow[]>(
+      `
+        SELECT COUNT(*) AS total
+        FROM products
+      `,
+    );
+
+    const total = countRows[0]?.total ?? 0;
+
     const [productRows] = await pool.query<ProductReadDB[]>(
       `
         SELECT
@@ -31,9 +50,19 @@ export class ProductsModel {
         FROM products p
         INNER JOIN brands b ON b.id = p.brand_id
         INNER JOIN categories c ON c.id = p.category_id
+        ORDER BY p.id DESC
+        LIMIT ? OFFSET ?
       `,
+      [pagination.limit, pagination.offset],
     );
-    return productRows.map(mapProductDBToProduct);
+
+    return {
+      items: productRows.map(mapProductDBToProduct),
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: total === 0 ? 0 : Math.ceil(total / pagination.limit),
+    };
   }
 
   static async getProductById(id: number): Promise<Product | null> {
