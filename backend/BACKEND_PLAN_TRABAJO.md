@@ -170,5 +170,11 @@ Tambien se extendio `src/utils/pagination.utils.ts` con helpers de parseo de que
 - Se movio `@types/cors` a `devDependencies` en `package.json` (tipos de desarrollo).
 **Validacion:** `npm.cmd install` y `npm.cmd run build` OK.
 
+### Cambio 22 - Separacion de bootstrap: CORS, env y rutas
+**Fecha:** 2026-04-17  
+**Resumen:** Se movio la configuracion de CORS a `src/config/cors.ts` y las variables de entorno derivadas a `src/config/env.ts`.  
+Ademas, se centralizo el registro de rutas en `src/routes/index.ts` para dejar `src/app.ts` enfocado solo en el arranque de la aplicacion.
+**Validacion:** `npm.cmd run build` OK.
+
 ## Proximos cambios
 - Pendiente: definir nuevos cambios.
