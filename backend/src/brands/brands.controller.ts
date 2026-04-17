@@ -1,18 +1,10 @@
 import type { Request, Response } from 'express';
+import {
+  getErrorData,
+  getStatusCode,
+} from '../utils/controller-error.utils.js';
 import { BrandsModel } from './brands.model.js';
 import { createBrandSchema, updateBrandSchema } from './brands.schema.js';
-
-function getStatusCode(error: unknown): number | null {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'statusCode' in error &&
-    typeof (error as { statusCode?: unknown }).statusCode === 'number'
-  ) {
-    return (error as { statusCode: number }).statusCode;
-  }
-  return null;
-}
 
 export class BrandsController {
   static async getAllBrands(req: Request, res: Response) {
@@ -20,7 +12,7 @@ export class BrandsController {
       const brands = await BrandsModel.getAllBrands();
       return res.success(brands, 'Marcas obtenidas con exito', 200);
     } catch (error) {
-      return res.error('Error al obtener marcas', 500);
+      return res.error('Error al obtener marcas', 500, getErrorData(error));
     }
   }
 
@@ -35,7 +27,7 @@ export class BrandsController {
 
       return res.success(brand, 'Marca obtenida correctamente', 200);
     } catch (error) {
-      return res.error('Error al obtener marca', 500);
+      return res.error('Error al obtener marca', 500, getErrorData(error));
     }
   }
 
@@ -49,9 +41,13 @@ export class BrandsController {
     } catch (error) {
       const statusCode = getStatusCode(error);
       if (statusCode) {
-        return res.error(String((error as { message?: string }).message), statusCode);
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
       }
-      return res.error('Error al crear marca', 500);
+      return res.error('Error al crear marca', 500, getErrorData(error));
     }
   }
 
@@ -72,7 +68,15 @@ export class BrandsController {
 
       return res.success(brand, 'Marca actualizada correctamente', 200);
     } catch (error) {
-      return res.error('Error al actualizar marca', 500);
+      const statusCode = getStatusCode(error);
+      if (statusCode) {
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
+      }
+      return res.error('Error al actualizar marca', 500, getErrorData(error));
     }
   }
 
@@ -87,7 +91,15 @@ export class BrandsController {
 
       return res.success(brand, 'Marca eliminada correctamente', 200);
     } catch (error) {
-      return res.error('Error al eliminar marca', 500);
+      const statusCode = getStatusCode(error);
+      if (statusCode) {
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
+      }
+      return res.error('Error al eliminar marca', 500, getErrorData(error));
     }
   }
 }

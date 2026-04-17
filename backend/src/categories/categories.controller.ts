@@ -1,21 +1,13 @@
 import type { Request, Response } from 'express';
+import {
+  getErrorData,
+  getStatusCode,
+} from '../utils/controller-error.utils.js';
 import { CategoriesModel } from './categories.model.js';
 import {
   createCategorySchema,
   updateCategorySchema,
 } from './categories.schema.js';
-
-function getStatusCode(error: unknown): number | null {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'statusCode' in error &&
-    typeof (error as { statusCode?: unknown }).statusCode === 'number'
-  ) {
-    return (error as { statusCode: number }).statusCode;
-  }
-  return null;
-}
 
 export class CategoriesController {
   static async getAllCategories(req: Request, res: Response) {
@@ -23,7 +15,7 @@ export class CategoriesController {
       const categories = await CategoriesModel.getAllCategories();
       return res.success(categories, 'Categorias obtenidas con exito', 200);
     } catch (error) {
-      return res.error('Error al obtener categorias', 500);
+      return res.error('Error al obtener categorias', 500, getErrorData(error));
     }
   }
 
@@ -38,7 +30,7 @@ export class CategoriesController {
 
       return res.success(category, 'Categoria obtenida correctamente', 200);
     } catch (error) {
-      return res.error('Error al obtener categoria', 500);
+      return res.error('Error al obtener categoria', 500, getErrorData(error));
     }
   }
 
@@ -52,9 +44,13 @@ export class CategoriesController {
     } catch (error) {
       const statusCode = getStatusCode(error);
       if (statusCode) {
-        return res.error(String((error as { message?: string }).message), statusCode);
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
       }
-      return res.error('Error al crear categoria', 500);
+      return res.error('Error al crear categoria', 500, getErrorData(error));
     }
   }
 
@@ -75,7 +71,15 @@ export class CategoriesController {
 
       return res.success(category, 'Categoria actualizada correctamente', 200);
     } catch (error) {
-      return res.error('Error al actualizar categoria', 500);
+      const statusCode = getStatusCode(error);
+      if (statusCode) {
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
+      }
+      return res.error('Error al actualizar categoria', 500, getErrorData(error));
     }
   }
 
@@ -90,7 +94,15 @@ export class CategoriesController {
 
       return res.success(category, 'Categoria eliminada correctamente', 200);
     } catch (error) {
-      return res.error('Error al eliminar categoria', 500);
+      const statusCode = getStatusCode(error);
+      if (statusCode) {
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
+      }
+      return res.error('Error al eliminar categoria', 500, getErrorData(error));
     }
   }
 }

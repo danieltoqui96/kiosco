@@ -13,7 +13,6 @@ import {
   mapProductDBToProduct,
   mapProductToProductDB,
 } from '../utils/product.mapper.js';
-import type { Brand } from '../brands/brands.schema.js';
 
 export class ProductsModel {
   static async getAllProducts(): Promise<Product[]> {

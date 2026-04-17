@@ -1,18 +1,10 @@
 import type { Request, Response } from 'express';
 import { createProductSchema, updateProductSchema } from './products.schema.js';
 import { ProductsModel } from './products.model.js';
-
-function getStatusCode(error: unknown): number | null {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'statusCode' in error &&
-    typeof (error as { statusCode?: unknown }).statusCode === 'number'
-  ) {
-    return (error as { statusCode: number }).statusCode;
-  }
-  return null;
-}
+import {
+  getErrorData,
+  getStatusCode,
+} from '../utils/controller-error.utils.js';
 
 export class ProductsController {
   static async getAllProducts(req: Request, res: Response) {
@@ -20,7 +12,7 @@ export class ProductsController {
       const products = await ProductsModel.getAllProducts();
       return res.success(products, 'Productos obtenidos con exito', 200);
     } catch (error) {
-      return res.error('Error al obtener los productos', 500);
+      return res.error('Error al obtener los productos', 500, getErrorData(error));
     }
   }
 
@@ -38,7 +30,7 @@ export class ProductsController {
 
       return res.success(product, 'Producto obtenido correctamente', 200);
     } catch (error) {
-      return res.error('Error al obtener el producto', 500);
+      return res.error('Error al obtener el producto', 500, getErrorData(error));
     }
   }
 
@@ -54,7 +46,7 @@ export class ProductsController {
 
       return res.success(product, 'Producto obtenido correctamente', 200);
     } catch (error) {
-      return res.error('Error al obtener el producto', 500);
+      return res.error('Error al obtener el producto', 500, getErrorData(error));
     }
   }
 
@@ -70,9 +62,13 @@ export class ProductsController {
     } catch (error) {
       const statusCode = getStatusCode(error);
       if (statusCode) {
-        return res.error(String((error as { message?: string }).message), statusCode);
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
       }
-      return res.error('Error al agregar el producto', 500);
+      return res.error('Error al agregar el producto', 500, getErrorData(error));
     }
   }
 
@@ -97,9 +93,13 @@ export class ProductsController {
     } catch (error) {
       const statusCode = getStatusCode(error);
       if (statusCode) {
-        return res.error(String((error as { message?: string }).message), statusCode);
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
       }
-      return res.error('Error al modificar el producto', 500);
+      return res.error('Error al modificar el producto', 500, getErrorData(error));
     }
   }
 
@@ -115,7 +115,7 @@ export class ProductsController {
 
       return res.success(product, 'Producto eliminado correctamente', 200);
     } catch (error) {
-      return res.error('Error al eliminar el producto', 500);
+      return res.error('Error al eliminar el producto', 500, getErrorData(error));
     }
   }
 }

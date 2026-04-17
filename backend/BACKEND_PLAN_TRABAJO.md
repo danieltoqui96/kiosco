@@ -129,5 +129,11 @@ Los modelos de `brands` y `categories` ahora lanzan errores con formato `{ messa
 Se agrego tipado global de Express para `Response`, se integro el middleware en `app.ts` y se migraron los controladores de `products`, `brands` y `categories` a `res.success(...)` y `res.error(...)`.
 **Validacion:** `npm.cmd run build` OK.
 
+### Cambio 16 - Helper compartido de status code y error en `data`
+**Fecha:** 2026-04-17  
+**Resumen:** Se centralizo `getStatusCode` en `src/utils/controller-error.utils.ts` y se agrego `getErrorData` para enviar detalles del error en `data` al responder con `res.error(...)`.  
+Se actualizaron controladores de `products`, `brands` y `categories` para dejar de repetir esa logica y responder errores de forma consistente.
+**Validacion:** `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Cambio 16: Agregar CORS.
+- Cambio 17: Agregar CORS.
