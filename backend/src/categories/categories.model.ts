@@ -60,7 +60,7 @@ export class CategoriesModel {
     const category = await this.getCategoryById(result.insertId);
     if (!category) {
       throw {
-        message: 'Categoría creada pero no se pudo recuperar',
+        message: 'Categoria creada pero no se pudo recuperar',
         statusCode: 500,
       };
     }

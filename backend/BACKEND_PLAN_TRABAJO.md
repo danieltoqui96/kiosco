@@ -162,5 +162,13 @@ En `GET /brands` y `GET /categories` se agrego `search` por nombre (LIKE), mante
 Tambien se extendio `src/utils/pagination.utils.ts` con helpers de parseo de query params (`string`, `number`, `boolean`).
 **Validacion:** `npm.cmd run build` OK.
 
+### Cambio 21 - Ajustes opcionales de limpieza y estructura
+**Fecha:** 2026-04-17  
+**Resumen:** Se eliminaron piezas no usadas y se ordenaron detalles de estructura:
+- Se removio `baseWriteProductSchema` en `products.schema.ts` (no se usaba).
+- Se corrigio texto con encoding roto en `categories.model.ts` para mantener mensajes consistentes.
+- Se movio `@types/cors` a `devDependencies` en `package.json` (tipos de desarrollo).
+**Validacion:** `npm.cmd install` y `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Cambio 21: Mejora de codigo y comentarios.
+- Pendiente: definir nuevos cambios.
