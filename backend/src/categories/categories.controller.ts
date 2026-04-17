@@ -3,7 +3,7 @@ import {
   getErrorData,
   getStatusCode,
 } from '../utils/controller-error.utils.js';
-import { getPaginationParams } from '../utils/pagination.utils.js';
+import { getPaginationParams, getQueryString } from '../utils/pagination.utils.js';
 import { CategoriesModel } from './categories.model.js';
 import {
   createCategorySchema,
@@ -14,7 +14,11 @@ export class CategoriesController {
   static async getAllCategories(req: Request, res: Response) {
     try {
       const pagination = getPaginationParams(req.query.page, req.query.limit);
-      const categories = await CategoriesModel.getAllCategories(pagination);
+      const search = getQueryString(req.query.search);
+      const categories = await CategoriesModel.getAllCategories(
+        pagination,
+        search,
+      );
       return res.success(categories, 'Categorias obtenidas con exito', 200);
     } catch (error) {
       return res.error('Error al obtener categorias', 500, getErrorData(error));

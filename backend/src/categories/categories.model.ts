@@ -18,15 +18,20 @@ interface CountRow extends RowDataPacket {
 export class CategoriesModel {
   static async getAllCategories(
     pagination: PaginationParams,
+    search?: string,
   ): Promise<PaginatedResult<Category>> {
+    const whereSql = search ? 'WHERE name LIKE ?' : '';
+    const whereParams: unknown[] = search ? [`%${search}%`] : [];
+
     const [countRows] = await pool.query<CountRow[]>(
-      'SELECT COUNT(*) AS total FROM categories',
+      `SELECT COUNT(*) AS total FROM categories ${whereSql}`,
+      whereParams,
     );
     const total = countRows[0]?.total ?? 0;
 
     const [rows] = await pool.query<CategoryDB[]>(
-      'SELECT * FROM categories ORDER BY id DESC LIMIT ? OFFSET ?',
-      [pagination.limit, pagination.offset],
+      `SELECT * FROM categories ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      [...whereParams, pagination.limit, pagination.offset],
     );
 
     return {

@@ -20,6 +20,36 @@ function toSingleValue(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+export function getQueryString(value: unknown): string | undefined {
+  const parsedValue = toSingleValue(value);
+  if (!parsedValue) return undefined;
+
+  const normalizedValue = parsedValue.trim();
+  if (normalizedValue.length === 0) return undefined;
+
+  return normalizedValue;
+}
+
+export function getQueryNumber(value: unknown): number | undefined {
+  const parsedValue = toSingleValue(value);
+  if (!parsedValue) return undefined;
+
+  const parsedNumber = Number(parsedValue);
+  if (Number.isNaN(parsedNumber)) return undefined;
+
+  return parsedNumber;
+}
+
+export function getQueryBoolean(value: unknown): boolean | undefined {
+  const parsedValue = toSingleValue(value);
+  if (!parsedValue) return undefined;
+
+  const normalizedValue = parsedValue.trim().toLowerCase();
+  if (normalizedValue === 'true' || normalizedValue === '1') return true;
+  if (normalizedValue === 'false' || normalizedValue === '0') return false;
+  return undefined;
+}
+
 function parsePositiveInt(value: unknown): number | null {
   const parsedValue = toSingleValue(value);
   if (!parsedValue) return null;
@@ -43,4 +73,3 @@ export function getPaginationParams(
 
   return { page, limit, offset };
 }
-

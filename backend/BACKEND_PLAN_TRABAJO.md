@@ -154,5 +154,13 @@ Tambien se actualizo `.env.template` con `CORS_ORIGINS=`.
 Los modelos ahora retornan estructura paginada con `items`, `page`, `limit`, `total` y `totalPages`, y se agrego util compartido `src/utils/pagination.utils.ts`.
 **Validacion:** `npm.cmd run build` OK.
 
+### Cambio 20 - Filtros en products y busqueda en brands/categories
+**Fecha:** 2026-04-17  
+**Resumen:** Se agregaron filtros en `GET /products` con query params:
+`search`, `brand`, `category`, `isActive`, `minSalePrice`, `maxSalePrice`, `minStock`, `maxStock`.  
+En `GET /brands` y `GET /categories` se agrego `search` por nombre (LIKE), manteniendo paginacion y metadatos.
+Tambien se extendio `src/utils/pagination.utils.ts` con helpers de parseo de query params (`string`, `number`, `boolean`).
+**Validacion:** `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Cambio 20: Filtros en getAll (products y busqueda por nombre en brands/categories).
+- Cambio 21: Mejora de codigo y comentarios.

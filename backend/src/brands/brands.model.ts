@@ -14,15 +14,20 @@ interface CountRow extends RowDataPacket {
 export class BrandsModel {
   static async getAllBrands(
     pagination: PaginationParams,
+    search?: string,
   ): Promise<PaginatedResult<Brand>> {
+    const whereSql = search ? 'WHERE name LIKE ?' : '';
+    const whereParams: unknown[] = search ? [`%${search}%`] : [];
+
     const [countRows] = await pool.query<CountRow[]>(
-      'SELECT COUNT(*) AS total FROM brands',
+      `SELECT COUNT(*) AS total FROM brands ${whereSql}`,
+      whereParams,
     );
     const total = countRows[0]?.total ?? 0;
 
     const [rows] = await pool.query<BrandDB[]>(
-      'SELECT * FROM brands ORDER BY id DESC LIMIT ? OFFSET ?',
-      [pagination.limit, pagination.offset],
+      `SELECT * FROM brands ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      [...whereParams, pagination.limit, pagination.offset],
     );
 
     return {

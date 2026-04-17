@@ -22,15 +22,78 @@ interface CountRow extends RowDataPacket {
   total: number;
 }
 
+export interface ProductsFilters {
+  search?: string | undefined;
+  brand?: string | undefined;
+  category?: string | undefined;
+  isActive?: boolean | undefined;
+  minSalePrice?: number | undefined;
+  maxSalePrice?: number | undefined;
+  minStock?: number | undefined;
+  maxStock?: number | undefined;
+}
+
 export class ProductsModel {
   static async getAllProducts(
     pagination: PaginationParams,
+    filters: ProductsFilters,
   ): Promise<PaginatedResult<Product>> {
+    const whereClauses: string[] = [];
+    const whereParams: unknown[] = [];
+
+    if (filters.search) {
+      whereClauses.push('(p.name LIKE ? OR p.codebar LIKE ?)');
+      const searchValue = `%${filters.search}%`;
+      whereParams.push(searchValue, searchValue);
+    }
+
+    if (filters.brand) {
+      whereClauses.push('b.name = ?');
+      whereParams.push(filters.brand);
+    }
+
+    if (filters.category) {
+      whereClauses.push('c.name = ?');
+      whereParams.push(filters.category);
+    }
+
+    if (filters.isActive !== undefined) {
+      whereClauses.push('p.is_active = ?');
+      whereParams.push(filters.isActive ? 1 : 0);
+    }
+
+    if (filters.minSalePrice !== undefined) {
+      whereClauses.push('p.sale_price >= ?');
+      whereParams.push(filters.minSalePrice);
+    }
+
+    if (filters.maxSalePrice !== undefined) {
+      whereClauses.push('p.sale_price <= ?');
+      whereParams.push(filters.maxSalePrice);
+    }
+
+    if (filters.minStock !== undefined) {
+      whereClauses.push('p.stock >= ?');
+      whereParams.push(filters.minStock);
+    }
+
+    if (filters.maxStock !== undefined) {
+      whereClauses.push('p.stock <= ?');
+      whereParams.push(filters.maxStock);
+    }
+
+    const whereSql =
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
     const [countRows] = await pool.query<CountRow[]>(
       `
         SELECT COUNT(*) AS total
-        FROM products
+        FROM products p
+        INNER JOIN brands b ON b.id = p.brand_id
+        INNER JOIN categories c ON c.id = p.category_id
+        ${whereSql}
       `,
+      whereParams,
     );
 
     const total = countRows[0]?.total ?? 0;
@@ -50,10 +113,11 @@ export class ProductsModel {
         FROM products p
         INNER JOIN brands b ON b.id = p.brand_id
         INNER JOIN categories c ON c.id = p.category_id
+        ${whereSql}
         ORDER BY p.id DESC
         LIMIT ? OFFSET ?
       `,
-      [pagination.limit, pagination.offset],
+      [...whereParams, pagination.limit, pagination.offset],
     );
 
     return {
