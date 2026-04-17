@@ -1,5 +1,8 @@
 import type { Product, UpdateProduct } from '../products/products.schema.js';
-import type { ProductReadDB, ProductWriteDB } from '../products/products.types.js';
+import type {
+  ProductReadDB,
+  ProductWriteDB,
+} from '../products/products.types.js';
 
 export function mapProductDBToProduct(product: ProductReadDB): Product {
   return {

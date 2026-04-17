@@ -13,17 +13,7 @@ import {
   mapProductDBToProduct,
   mapProductToProductDB,
 } from '../utils/product.mapper.js';
-
-function isErrorWithCode(error: unknown): error is { message: string; code: number } {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof (error as { code?: unknown }).code === 'number' &&
-    'message' in error &&
-    typeof (error as { message?: unknown }).message === 'string'
-  );
-}
+import type { Brand } from '../brands/brands.schema.js';
 
 export class ProductsModel {
   static async getAllProducts(): Promise<Product[]> {
@@ -74,56 +64,35 @@ export class ProductsModel {
   }
 
   static async addProduct(data: CreateProduct): Promise<Product | null> {
-    let brandId: number;
-    try {
-      const brand = await BrandsModel.getOrCreateBrandByName(data.brand);
-      brandId = brand.id;
-    } catch (error) {
-      if (isErrorWithCode(error)) throw error;
+    const brand = await BrandsModel.getOrCreateBrand(data.brand);
+    const category = await CategoriesModel.getOrCreateCategory(data.category);
+
+    const [result] = await pool.query<ResultSetHeader>(
+      'INSERT INTO products SET ?',
+      [
+        {
+          codebar: data.codebar,
+          name: data.name,
+          brand_id: brand.id,
+          category_id: category.id,
+          sale_price: data.salePrice,
+          purchase_price: data.purchasePrice,
+          stock: data.stock,
+          is_active: data.isActive,
+        },
+      ],
+    );
+
+    const product = await this.getProductById(result.insertId);
+
+    if (!product) {
       throw {
-        message: 'Error al consultar o crear la marca',
-        code: 500,
+        message: 'Producto creado pero no se pudo recuperar',
+        statusCode: 500,
       };
     }
 
-    let categoryId: number;
-    try {
-      const category = await CategoriesModel.getOrCreateCategoryByName(
-        data.category,
-      );
-      categoryId = category.id;
-    } catch (error) {
-      if (isErrorWithCode(error)) throw error;
-      throw {
-        message: 'Error al consultar o crear la categoria',
-        code: 500,
-      };
-    }
-
-    try {
-      const [result] = await pool.query<ResultSetHeader>(
-        'INSERT INTO products SET ?',
-        [
-          {
-            codebar: data.codebar,
-            name: data.name,
-            brand_id: brandId,
-            category_id: categoryId,
-            sale_price: data.salePrice,
-            purchase_price: data.purchasePrice,
-            stock: data.stock,
-            is_active: data.isActive,
-          },
-        ],
-      );
-
-      return this.getProductById(result.insertId);
-    } catch (error) {
-      throw {
-        message: 'Error al crear el producto',
-        code: 500,
-      };
-    }
+    return product;
   }
 
   static async updateProduct(
@@ -134,46 +103,30 @@ export class ProductsModel {
     const cleanData = removeUndefined(mapData);
 
     if (data.brand !== undefined) {
-      try {
-        const brand = await BrandsModel.getOrCreateBrandByName(data.brand);
-        cleanData.brand_id = brand.id;
-      } catch (error) {
-        if (isErrorWithCode(error)) throw error;
-        throw {
-          message: 'Error al consultar o crear la marca',
-          code: 500,
-        };
-      }
+      const brand = await BrandsModel.getOrCreateBrand(data.brand);
+      cleanData.brand_id = brand.id;
     }
 
     if (data.category !== undefined) {
-      try {
-        const category = await CategoriesModel.getOrCreateCategoryByName(
-          data.category,
-        );
-        cleanData.category_id = category.id;
-      } catch (error) {
-        if (isErrorWithCode(error)) throw error;
-        throw {
-          message: 'Error al consultar o crear la categoria',
-          code: 500,
-        };
-      }
+      const category = await CategoriesModel.getOrCreateCategory(data.category);
+      cleanData.category_id = category.id;
     }
 
-    try {
-      const [result] = await pool.query<ResultSetHeader>(
-        'UPDATE products SET ? WHERE id = ?',
-        [cleanData, id],
-      );
-      if (result.affectedRows === 0) return null;
-      return this.getProductById(id);
-    } catch (error) {
+    const [result] = await pool.query<ResultSetHeader>(
+      'UPDATE products SET ? WHERE id = ?',
+      [cleanData, id],
+    );
+
+    if (result.affectedRows === 0) return null;
+
+    const product = await this.getProductById(id);
+    if (!product) {
       throw {
-        message: 'Error al actualizar el producto',
-        code: 500,
+        message: 'Producto actualizado pero no se pudo recuperar',
+        statusCode: 500,
       };
     }
+    return product;
   }
 
   static async deleteProduct(id: number): Promise<Product | null> {

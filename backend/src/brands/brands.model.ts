@@ -19,69 +19,20 @@ export class BrandsModel {
     return rows[0] ?? null;
   }
 
-  static async getBrandByNameExact(name: string): Promise<Brand> {
-    try {
-      const [rows] = await pool.query<BrandDB[]>(
-        'SELECT * FROM brands WHERE name = ?',
-        [name],
-      );
-      const brand = rows[0] ?? null;
-      if (!brand) {
-        throw {
-          message: 'Marca no encontrada',
-          code: 404,
-        };
-      }
-      return brand;
-    } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        'message' in error
-      ) {
-        throw error;
-      }
-      throw {
-        message: 'Error al buscar la marca por nombre',
-        code: 500,
-      };
-    }
-  }
-
-  static async getOrCreateBrandByName(name: string): Promise<Brand> {
-    try {
-      return await this.getBrandByNameExact(name);
-    } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        (error as { code?: number }).code === 404
-      ) {
-        const created = await this.addBrand({ name });
-        if (!created) {
-          throw {
-            message: 'No se pudo crear la marca',
-            code: 500,
-          };
-        }
-        return created;
-      }
-
-      throw {
-        message: 'Error al consultar o crear la marca',
-        code: 500,
-      };
-    }
-  }
-
-  static async addBrand(data: CreateBrand): Promise<Brand | null> {
+  static async addBrand(data: CreateBrand): Promise<Brand> {
     const [result] = await pool.query<ResultSetHeader>(
       'INSERT INTO brands (name) VALUES (?)',
       [data.name],
     );
-    return this.getBrandById(result.insertId);
+
+    const brand = await this.getBrandById(result.insertId);
+    if (!brand) {
+      throw {
+        message: 'Marca creada pero no se pudo recuperar',
+        statusCode: 500,
+      };
+    }
+    return brand;
   }
 
   static async updateBrand(
@@ -108,5 +59,21 @@ export class BrandsModel {
     );
     if (result.affectedRows === 0) return null;
     return current;
+  }
+
+  static async getOrCreateBrand(name: string): Promise<Brand> {
+    const [rows] = await pool.query<BrandDB[]>(
+      'SELECT * FROM brands WHERE name = ?',
+      [name],
+    );
+
+    const data = rows[0];
+    if (data)
+      return {
+        id: data.id,
+        name: data.name,
+      };
+
+    return this.addBrand({ name });
   }
 }

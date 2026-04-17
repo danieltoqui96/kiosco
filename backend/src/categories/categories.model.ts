@@ -23,69 +23,20 @@ export class CategoriesModel {
     return rows[0] ?? null;
   }
 
-  static async getCategoryByNameExact(name: string): Promise<Category> {
-    try {
-      const [rows] = await pool.query<CategoryDB[]>(
-        'SELECT * FROM categories WHERE name = ?',
-        [name],
-      );
-      const category = rows[0] ?? null;
-      if (!category) {
-        throw {
-          message: 'Categoria no encontrada',
-          code: 404,
-        };
-      }
-      return category;
-    } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        'message' in error
-      ) {
-        throw error;
-      }
-      throw {
-        message: 'Error al buscar la categoria por nombre',
-        code: 500,
-      };
-    }
-  }
-
-  static async getOrCreateCategoryByName(name: string): Promise<Category> {
-    try {
-      return await this.getCategoryByNameExact(name);
-    } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        (error as { code?: number }).code === 404
-      ) {
-        const created = await this.addCategory({ name });
-        if (!created) {
-          throw {
-            message: 'No se pudo crear la categoria',
-            code: 500,
-          };
-        }
-        return created;
-      }
-
-      throw {
-        message: 'Error al consultar o crear la categoria',
-        code: 500,
-      };
-    }
-  }
-
-  static async addCategory(data: CreateCategory): Promise<Category | null> {
+  static async addCategory(data: CreateCategory): Promise<Category> {
     const [result] = await pool.query<ResultSetHeader>(
       'INSERT INTO categories (name) VALUES (?)',
       [data.name],
     );
-    return this.getCategoryById(result.insertId);
+
+    const category = await this.getCategoryById(result.insertId);
+    if (!category) {
+      throw {
+        message: 'Categoría creada pero no se pudo recuperar',
+        statusCode: 500,
+      };
+    }
+    return category;
   }
 
   static async updateCategory(
@@ -112,5 +63,21 @@ export class CategoriesModel {
     );
     if (result.affectedRows === 0) return null;
     return current;
+  }
+
+  static async getOrCreateCategory(name: string): Promise<Category> {
+    const [rows] = await pool.query<CategoryDB[]>(
+      'SELECT * FROM categories WHERE name = ?',
+      [name],
+    );
+
+    const data = rows[0];
+    if (data)
+      return {
+        id: data.id,
+        name: data.name,
+      };
+
+    return this.addCategory({ name });
   }
 }
