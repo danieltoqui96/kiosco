@@ -135,5 +135,18 @@ Se agrego tipado global de Express para `Response`, se integro el middleware en 
 Se actualizaron controladores de `products`, `brands` y `categories` para dejar de repetir esa logica y responder errores de forma consistente.
 **Validacion:** `npm.cmd run build` OK.
 
+### Cambio 17 - Centralizacion final de `getStatusCode` y trazabilidad de errores
+**Fecha:** 2026-04-17  
+**Resumen:** Se removieron implementaciones locales repetidas de `getStatusCode` en controladores y se unifico el consumo de `src/utils/controller-error.utils.ts`.  
+En los `catch` se mantiene la respuesta estandar y ahora se adjunta `error` serializado en `data` para facilitar debug desde cliente.
+**Validacion:** `npm.cmd run build` OK.
+
+### Cambio 18 - Configuracion de CORS por entorno
+**Fecha:** 2026-04-17  
+**Resumen:** Se instalo `cors` y `@types/cors`, y se agrego middleware CORS en `app.ts` con lista de origenes permitidos desde `CORS_ORIGINS` (separados por coma).  
+Si `CORS_ORIGINS` esta vacio, se permite cualquier origen; si tiene valores, solo esos origenes quedan habilitados.
+Tambien se actualizo `.env.template` con `CORS_ORIGINS=`.
+**Validacion:** `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Cambio 17: Agregar CORS.
+- Cambio 19: Mejora de codigo y comentarios.
