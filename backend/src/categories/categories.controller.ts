@@ -1,24 +1,29 @@
 import type { Request, Response } from 'express';
-import { sendResponse } from '../utils/responses.js';
 import { CategoriesModel } from './categories.model.js';
 import {
   createCategorySchema,
   updateCategorySchema,
 } from './categories.schema.js';
 
+function getStatusCode(error: unknown): number | null {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'statusCode' in error &&
+    typeof (error as { statusCode?: unknown }).statusCode === 'number'
+  ) {
+    return (error as { statusCode: number }).statusCode;
+  }
+  return null;
+}
+
 export class CategoriesController {
   static async getAllCategories(req: Request, res: Response) {
     try {
       const categories = await CategoriesModel.getAllCategories();
-      sendResponse(
-        res,
-        true,
-        200,
-        categories,
-        'Categorias obtenidas con exito',
-      );
+      return res.success(categories, 'Categorias obtenidas con exito', 200);
     } catch (error) {
-      sendResponse(res, false, 500, null, 'Error al obtener categorias');
+      return res.error('Error al obtener categorias', 500);
     }
   }
 
@@ -26,63 +31,30 @@ export class CategoriesController {
     try {
       const id = Number(req.params.id);
       if (Number.isNaN(id) || id <= 0)
-        return sendResponse(res, false, 400, null, 'ID de categoria invalido');
+        return res.error('ID de categoria invalido', 400);
 
       const category = await CategoriesModel.getCategoryById(id);
-      if (!category)
-        return sendResponse(res, false, 404, null, 'Categoria no encontrada');
+      if (!category) return res.error('Categoria no encontrada', 404);
 
-      sendResponse(
-        res,
-        true,
-        200,
-        category,
-        'Categoria obtenida correctamente',
-      );
+      return res.success(category, 'Categoria obtenida correctamente', 200);
     } catch (error) {
-      sendResponse(res, false, 500, null, 'Error al obtener categoria');
+      return res.error('Error al obtener categoria', 500);
     }
   }
 
   static async addCategory(req: Request, res: Response) {
     try {
       const parsed = createCategorySchema.safeParse(req.body);
-      if (!parsed.success)
-        return sendResponse(
-          res,
-          false,
-          400,
-          parsed.error.issues,
-          'Datos invalidos',
-        );
+      if (!parsed.success) return res.error('Datos invalidos', 400, parsed.error.issues);
 
       const category = await CategoriesModel.addCategory(parsed.data);
-      if (!category)
-        return sendResponse(
-          res,
-          false,
-          500,
-          null,
-          'No se pudo crear la categoria',
-        );
-
-      sendResponse(res, true, 201, category, 'Categoria creada correctamente');
+      return res.success(category, 'Categoria creada correctamente', 201);
     } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'statusCode' in error &&
-        'message' in error
-      ) {
-        return sendResponse(
-          res,
-          false,
-          Number(error.statusCode),
-          null,
-          String(error.message),
-        );
+      const statusCode = getStatusCode(error);
+      if (statusCode) {
+        return res.error(String((error as { message?: string }).message), statusCode);
       }
-      sendResponse(res, false, 500, null, 'Error al crear categoria');
+      return res.error('Error al crear categoria', 500);
     }
   }
 
@@ -90,41 +62,20 @@ export class CategoriesController {
     try {
       const id = Number(req.params.id);
       if (Number.isNaN(id) || id <= 0)
-        return sendResponse(res, false, 400, null, 'ID de categoria invalido');
+        return res.error('ID de categoria invalido', 400);
 
       const parsed = updateCategorySchema.safeParse(req.body);
-      if (!parsed.success)
-        return sendResponse(
-          res,
-          false,
-          400,
-          parsed.error.issues,
-          'Datos invalidos',
-        );
+      if (!parsed.success) return res.error('Datos invalidos', 400, parsed.error.issues);
 
       if (Object.keys(parsed.data).length === 0)
-        return sendResponse(
-          res,
-          false,
-          400,
-          null,
-          'Enviar al menos un campo valido',
-        );
+        return res.error('Enviar al menos un campo valido', 400);
 
       const category = await CategoriesModel.updateCategory(id, parsed.data);
-      if (!category) {
-        return sendResponse(res, false, 404, null, 'Categoria no encontrada');
-      }
+      if (!category) return res.error('Categoria no encontrada', 404);
 
-      sendResponse(
-        res,
-        true,
-        200,
-        category,
-        'Categoria actualizada correctamente',
-      );
+      return res.success(category, 'Categoria actualizada correctamente', 200);
     } catch (error) {
-      sendResponse(res, false, 500, null, 'Error al actualizar categoria');
+      return res.error('Error al actualizar categoria', 500);
     }
   }
 
@@ -132,21 +83,14 @@ export class CategoriesController {
     try {
       const id = Number(req.params.id);
       if (Number.isNaN(id) || id <= 0)
-        return sendResponse(res, false, 400, null, 'ID de categoria invalido');
+        return res.error('ID de categoria invalido', 400);
 
       const category = await CategoriesModel.deleteCategory(id);
-      if (!category)
-        return sendResponse(res, false, 404, null, 'Categoria no encontrada');
+      if (!category) return res.error('Categoria no encontrada', 404);
 
-      sendResponse(
-        res,
-        true,
-        200,
-        category,
-        'Categoria eliminada correctamente',
-      );
+      return res.success(category, 'Categoria eliminada correctamente', 200);
     } catch (error) {
-      sendResponse(res, false, 500, null, 'Error al eliminar categoria');
+      return res.error('Error al eliminar categoria', 500);
     }
   }
 }

@@ -123,5 +123,11 @@ Los modelos de `brands` y `categories` ahora lanzan errores con formato `{ messa
 `products.model` reutiliza estas funciones para hacer find-or-create en add/update y los controladores manejan errores con un solo `if (error.code)`.
 **Validacion:** `npm.cmd run build` OK.
 
+### Cambio 15 - Middleware de respuestas (`res.success` / `res.error`)
+**Fecha:** 2026-04-17  
+**Resumen:** Se implemento middleware de respuesta para evitar el uso de `sendResponse(res, ...)` y simplificar controladores.  
+Se agrego tipado global de Express para `Response`, se integro el middleware en `app.ts` y se migraron los controladores de `products`, `brands` y `categories` a `res.success(...)` y `res.error(...)`.
+**Validacion:** `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Cambio 15: Agregar CORS.
+- Cambio 16: Agregar CORS.
