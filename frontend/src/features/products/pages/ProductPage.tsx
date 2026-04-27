@@ -24,6 +24,7 @@ export const ProductPage = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isBarcodeSearching, setIsBarcodeSearching] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [barcodeQuery, setBarcodeQuery] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
@@ -213,14 +214,42 @@ export const ProductPage = () => {
     );
   };
 
-  const handleSubmitProduct = (values: ProductFormValues) => {
-    void values;
-    window.alert(
-      modalState.mode === 'create'
-        ? 'Create flow will be connected in Stage 3.'
-        : 'Edit flow will be connected in Stage 3.',
-    );
-    setModalState(defaultModalState);
+  const handleSubmitProduct = async (values: ProductFormValues) => {
+    if (modalState.mode !== 'create') {
+      window.alert('Edit flow will be connected in Stage 3.');
+      setModalState(defaultModalState);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const createdProduct = await productsApi.create(values);
+
+      setSelectedProductId(createdProduct.id);
+      setIsDetailOpen(true);
+      setModalState(defaultModalState);
+      setBarcodeQuery('');
+      setSearchFilter('');
+      setBrandFilter('');
+      setCategoryFilter('');
+      setStatusFilter('');
+
+      if (page !== 1) {
+        setPage(1);
+      } else {
+        await fetchProducts();
+      }
+
+      void fetchCatalogs();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to create product.';
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -379,8 +408,11 @@ export const ProductPage = () => {
         isOpen={modalState.isOpen}
         mode={modalState.mode}
         initialValues={modalInitialValues}
+        isSubmitting={isSubmitting}
         onClose={() => setModalState(defaultModalState)}
-        onSubmit={handleSubmitProduct}
+        onSubmit={(values) => {
+          void handleSubmitProduct(values);
+        }}
       />
     </>
   );
