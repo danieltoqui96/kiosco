@@ -39,6 +39,14 @@
   font-size: 0.875rem;
 }
 
+.sidebar .nav-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+}
+
 /* Compact layout for products search + filters to show more rows */
 .main-content {
   gap: var(--space-md);

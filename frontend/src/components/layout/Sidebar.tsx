@@ -1,4 +1,11 @@
-export const Sidebar = () => {
+import type { CatalogSection } from './MainLayout';
+
+interface SidebarProps {
+  currentSection: CatalogSection;
+  onNavigate: (section: CatalogSection) => void;
+}
+
+export const Sidebar = ({ currentSection, onNavigate }: SidebarProps) => {
   return (
     <div>
       <aside className="sidebar">
@@ -8,18 +15,30 @@ export const Sidebar = () => {
         </div>
 
         <nav className="sidebar-nav">
-          <a href="#" className="nav-item active">
+          <button
+            type="button"
+            className={`nav-item${currentSection === 'products' ? ' active' : ''}`}
+            onClick={() => onNavigate('products')}
+          >
             <span className="nav-icon">P</span>
             <span className="nav-label">Productos</span>
-          </a>
-          <a href="#" className="nav-item">
+          </button>
+          <button
+            type="button"
+            className={`nav-item${currentSection === 'categories' ? ' active' : ''}`}
+            onClick={() => onNavigate('categories')}
+          >
             <span className="nav-icon">C</span>
             <span className="nav-label">Categorias</span>
-          </a>
-          <a href="#" className="nav-item">
+          </button>
+          <button
+            type="button"
+            className={`nav-item${currentSection === 'brands' ? ' active' : ''}`}
+            onClick={() => onNavigate('brands')}
+          >
             <span className="nav-icon">M</span>
             <span className="nav-label">Marcas</span>
-          </a>
+          </button>
         </nav>
       </aside>
     </div>

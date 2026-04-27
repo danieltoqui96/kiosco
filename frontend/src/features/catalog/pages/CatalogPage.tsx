@@ -1,0 +1,459 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import '../../products/styles/products.css';
+import { brandsApi, categoriesApi } from '../../products/api/catalog.api';
+import { productsApi } from '../../products/api/products.api';
+import type {
+  Brand,
+  Category,
+  Product,
+  ProductQueryParams,
+} from '../../products/types';
+
+type CatalogMode = 'brands' | 'categories';
+
+type CatalogEntity = Brand | Category;
+
+interface CatalogItem {
+  id: number;
+  name: string;
+  productsCount: number;
+}
+
+interface DetailProduct {
+  id: number;
+  codebar: string;
+  name: string;
+}
+
+interface CatalogPageProps {
+  mode: CatalogMode;
+}
+
+const LIST_PAGE_SIZE = 10;
+const DETAIL_PRODUCTS_PAGE_SIZE = 100;
+
+function buildVisiblePages(currentPage: number, totalPages: number): number[] {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 3) return [1, 2, 3, 4, totalPages];
+  if (currentPage >= totalPages - 2) {
+    return [1, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+  return [1, currentPage - 1, currentPage, currentPage + 1, totalPages];
+}
+
+function mapDetailProduct(product: Product): DetailProduct {
+  return {
+    id: product.id,
+    codebar: product.codebar,
+    name: product.name,
+  };
+}
+
+export const CatalogPage = ({ mode }: CatalogPageProps) => {
+  const [items, setItems] = useState<CatalogItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+  const [detailProducts, setDetailProducts] = useState<DetailProduct[]>([]);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [isListLoading, setIsListLoading] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(true);
+
+  const singularLabel = mode === 'brands' ? 'Marca' : 'Categoria';
+  const pluralLabel = mode === 'brands' ? 'Marcas' : 'Categorias';
+
+  const getProductsFilter = useCallback(
+    (name: string): ProductQueryParams =>
+      mode === 'brands' ? { brand: name } : { category: name },
+    [mode],
+  );
+
+  const fetchProductsCountByName = useCallback(
+    async (name: string): Promise<number> => {
+      const response = await productsApi.getAll({
+        page: 1,
+        limit: 1,
+        ...getProductsFilter(name),
+      });
+
+      return response.total;
+    },
+    [getProductsFilter],
+  );
+
+  const fetchCatalogItems = useCallback(async () => {
+    setIsListLoading(true);
+    setListError(null);
+
+    try {
+      const response =
+        mode === 'brands'
+          ? await brandsApi.getAll({
+              page,
+              limit: LIST_PAGE_SIZE,
+              search: searchQuery || undefined,
+            })
+          : await categoriesApi.getAll({
+              page,
+              limit: LIST_PAGE_SIZE,
+              search: searchQuery || undefined,
+            });
+
+      if (response.totalPages === 0 && page !== 1) {
+        setPage(1);
+        return;
+      }
+
+      if (response.totalPages > 0 && page > response.totalPages) {
+        setPage(response.totalPages);
+        return;
+      }
+
+      const entities = response.items as CatalogEntity[];
+      const withCounts = await Promise.all(
+        entities.map(async (item) => ({
+          id: item.id,
+          name: item.name,
+          productsCount: await fetchProductsCountByName(item.name).catch(() => 0),
+        })),
+      );
+
+      setItems(withCounts);
+      setTotalItems(response.total);
+      setTotalPages(response.totalPages);
+
+      if (selectedItem && !withCounts.some((item) => item.id === selectedItem.id)) {
+        setSelectedItem(null);
+        setDetailProducts([]);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : `No se pudo cargar ${pluralLabel.toLowerCase()}.`;
+      setListError(message);
+      setItems([]);
+      setTotalItems(0);
+      setTotalPages(0);
+    } finally {
+      setIsListLoading(false);
+    }
+  }, [fetchProductsCountByName, mode, page, pluralLabel, searchQuery, selectedItem]);
+
+  const fetchDetailProducts = useCallback(
+    async (item: CatalogItem) => {
+      setIsDetailLoading(true);
+      setDetailError(null);
+
+      try {
+        let currentPage = 1;
+        let pages = 1;
+        const products: DetailProduct[] = [];
+
+        do {
+          const response = await productsApi.getAll({
+            page: currentPage,
+            limit: DETAIL_PRODUCTS_PAGE_SIZE,
+            ...getProductsFilter(item.name),
+          });
+
+          products.push(...response.items.map(mapDetailProduct));
+
+          pages = response.totalPages === 0 ? 1 : response.totalPages;
+          currentPage += 1;
+        } while (currentPage <= pages);
+
+        setDetailProducts(products);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : `No se pudieron cargar productos de ${singularLabel.toLowerCase()}.`;
+        setDetailError(message);
+        setDetailProducts([]);
+      } finally {
+        setIsDetailLoading(false);
+      }
+    },
+    [getProductsFilter, singularLabel],
+  );
+
+  useEffect(() => {
+    setPage(1);
+    setSearchInput('');
+    setSearchQuery('');
+    setSelectedItem(null);
+    setDetailProducts([]);
+  }, [mode]);
+
+  useEffect(() => {
+    void fetchCatalogItems();
+  }, [fetchCatalogItems]);
+
+  const visiblePages = useMemo(() => buildVisiblePages(page, totalPages), [page, totalPages]);
+  const rangeStart = totalItems === 0 ? 0 : (page - 1) * LIST_PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * LIST_PAGE_SIZE, totalItems);
+
+  return (
+    <>
+      <main className="main-content">
+        <header className="page-header">
+          <div className="header-left">
+            <h1 className="page-title">Gestion de {pluralLabel.toLowerCase()}</h1>
+            <span className="breadcrumb">Inicio / {pluralLabel}</span>
+          </div>
+        </header>
+
+        <section className="filters-bar">
+          <div className="filters-group">
+            <div className="filter-item">
+              <label className="filter-label" htmlFor="catalog-search">
+                Buscar {singularLabel.toLowerCase()}
+              </label>
+              <input
+                id="catalog-search"
+                className="form-input"
+                placeholder={`Nombre de ${singularLabel.toLowerCase()}...`}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    setSearchQuery(searchInput.trim());
+                    setPage(1);
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="filters-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setSearchQuery(searchInput.trim());
+                setPage(1);
+              }}
+            >
+              Buscar
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setSearchInput('');
+                setSearchQuery('');
+                setPage(1);
+              }}
+            >
+              Limpiar
+            </button>
+            <span className="results-count">
+              Mostrando {items.length} de {totalItems} {pluralLabel.toLowerCase()}
+            </span>
+          </div>
+        </section>
+
+        {listError ? <p className="form-error">{listError}</p> : null}
+
+        <section className="data-table-container">
+          <table className="data-table">
+            <thead className="table-header">
+              <tr>
+                <th className="table-cell table-cell--header">ID</th>
+                <th className="table-cell table-cell--header">Nombre</th>
+                <th className="table-cell table-cell--header table-cell--right">
+                  Cantidad productos
+                </th>
+              </tr>
+            </thead>
+            <tbody className="table-body">
+              {isListLoading ? (
+                <tr className="table-row">
+                  <td className="table-cell" colSpan={3}>
+                    Cargando {pluralLabel.toLowerCase()}...
+                  </td>
+                </tr>
+              ) : items.length === 0 ? (
+                <tr className="table-row">
+                  <td className="table-cell" colSpan={3}>
+                    No hay {pluralLabel.toLowerCase()} para mostrar.
+                  </td>
+                </tr>
+              ) : (
+                items.map((item) => {
+                  const isSelected = selectedItem?.id === item.id;
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`table-row table-row--clickable${isSelected ? ' table-row--selected' : ''}`}
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setIsDetailOpen(true);
+                        void fetchDetailProducts(item);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedItem(item);
+                          setIsDetailOpen(true);
+                          void fetchDetailProducts(item);
+                        }
+                      }}
+                      tabIndex={0}
+                    >
+                      <td className="table-cell table-cell--number">{item.id}</td>
+                      <td className="table-cell">{item.name}</td>
+                      <td className="table-cell table-cell--right table-cell--number">
+                        {item.productsCount}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+
+          <div className="table-pagination">
+            <div className="pagination-info">
+              Mostrando {rangeStart}-{rangeEnd} de {totalItems} registros
+            </div>
+            <div className="pagination-controls">
+              <button
+                type="button"
+                className={`pagination-btn${page <= 1 ? ' pagination-btn--disabled' : ''}`}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1}
+              >
+                Anterior
+              </button>
+              <span className="pagination-pages">
+                {visiblePages.map((visiblePage, index) => {
+                  const previousPage = visiblePages[index - 1];
+                  const needsEllipsis =
+                    previousPage !== undefined && visiblePage - previousPage > 1;
+
+                  return (
+                    <span key={visiblePage}>
+                      {needsEllipsis ? (
+                        <span className="pagination-ellipsis">...</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={`pagination-page${page === visiblePage ? ' pagination-page--active' : ''}`}
+                        onClick={() => setPage(visiblePage)}
+                      >
+                        {visiblePage}
+                      </button>
+                    </span>
+                  );
+                })}
+              </span>
+              <button
+                type="button"
+                className={`pagination-btn${page >= totalPages ? ' pagination-btn--disabled' : ''}`}
+                onClick={() =>
+                  setPage((current) =>
+                    totalPages === 0 ? 1 : Math.min(totalPages, current + 1),
+                  )
+                }
+                disabled={page >= totalPages}
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <aside className={`detail-panel${isDetailOpen ? ' detail-panel--open' : ''}`}>
+        <div className="panel-header">
+          <h2 className="panel-title">Detalle de {singularLabel.toLowerCase()}</h2>
+          <button
+            type="button"
+            className="panel-close"
+            title="Cerrar"
+            onClick={() => setIsDetailOpen(false)}
+          >
+            x
+          </button>
+        </div>
+
+        <div className="panel-content">
+          {!selectedItem ? (
+            <div className="detail-section">
+              <h4 className="section-title">Sin seleccion</h4>
+              <p className="detail-description">
+                Selecciona una fila para ver el detalle de {singularLabel.toLowerCase()}.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="detail-hero">
+                <div className="detail-header-info">
+                  <h3 className="detail-title">{selectedItem.name}</h3>
+                  <p className="detail-sku">ID: {selectedItem.id}</p>
+                </div>
+              </div>
+
+              <div className="detail-stats">
+                <div className="stat-card">
+                  <span className="stat-label">Cantidad productos</span>
+                  <span className="stat-value">{selectedItem.productsCount}</span>
+                </div>
+              </div>
+
+              <div className="detail-section">
+                <h4 className="section-title">Productos asociados</h4>
+                {detailError ? <p className="form-error">{detailError}</p> : null}
+
+                <div className="data-table-container">
+                  <table className="data-table">
+                    <thead className="table-header">
+                      <tr>
+                        <th className="table-cell table-cell--header">ID</th>
+                        <th className="table-cell table-cell--header">Codigo</th>
+                        <th className="table-cell table-cell--header">Nombre</th>
+                      </tr>
+                    </thead>
+                    <tbody className="table-body">
+                      {isDetailLoading ? (
+                        <tr className="table-row">
+                          <td className="table-cell" colSpan={3}>
+                            Cargando productos...
+                          </td>
+                        </tr>
+                      ) : detailProducts.length === 0 ? (
+                        <tr className="table-row">
+                          <td className="table-cell" colSpan={3}>
+                            No hay productos asociados.
+                          </td>
+                        </tr>
+                      ) : (
+                        detailProducts.map((product) => (
+                          <tr key={product.id} className="table-row">
+                            <td className="table-cell table-cell--number">{product.id}</td>
+                            <td className="table-cell table-cell--code">{product.codebar}</td>
+                            <td className="table-cell">{product.name}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </aside>
+    </>
+  );
+};
