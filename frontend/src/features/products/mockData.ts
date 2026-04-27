@@ -1,0 +1,111 @@
+import { toProductViewModel } from './presentation.utils';
+import type { Product, ProductViewModel } from './types';
+
+const baseProducts: Product[] = [
+  {
+    id: 1,
+    codebar: '7501234567890',
+    name: 'Smartphone Galaxy A54',
+    brand: 'Samsung',
+    category: 'Electronics',
+    salePrice: 849900,
+    purchasePrice: 620000,
+    stock: 45,
+    isActive: true,
+  },
+  {
+    id: 2,
+    codebar: '7509876543210',
+    name: 'Laptop HP Pavilion 15',
+    brand: 'HP',
+    category: 'Electronics',
+    salePrice: 1599900,
+    purchasePrice: 1210000,
+    stock: 3,
+    isActive: true,
+  },
+  {
+    id: 3,
+    codebar: '7501111222333',
+    name: 'Printer Epson L3250',
+    brand: 'Epson',
+    category: 'Office',
+    salePrice: 429900,
+    purchasePrice: 350000,
+    stock: 28,
+    isActive: true,
+  },
+  {
+    id: 4,
+    codebar: '7504445556667',
+    name: 'Sony WH-1000XM5 Headphones',
+    brand: 'Sony',
+    category: 'Electronics',
+    salePrice: 749900,
+    purchasePrice: 520000,
+    stock: 12,
+    isActive: true,
+  },
+  {
+    id: 5,
+    codebar: '7507778889990',
+    name: 'Logitech G Pro Keyboard',
+    brand: 'Logitech',
+    category: 'Electronics',
+    salePrice: 289900,
+    purchasePrice: 180000,
+    stock: 0,
+    isActive: false,
+  },
+  {
+    id: 6,
+    codebar: '7509998887776',
+    name: 'A4 Paper Box 500 Sheets',
+    brand: 'Xerox',
+    category: 'Office',
+    salePrice: 7900,
+    purchasePrice: 4300,
+    stock: 120,
+    isActive: true,
+  },
+];
+
+const mockExtras: Record<number, Partial<ProductViewModel>> = {
+  1: {
+    sku: 'SAM-A54-128',
+    provider: 'TechSupply SA',
+    model: 'A54',
+    monthlySales: 31,
+    minStock: 8,
+    location: 'Warehouse A - Shelf 2',
+    lastEntryDate: '2026-03-15',
+  },
+  2: {
+    sku: 'HP-PAV15-512',
+    provider: 'Distribuidora Norte',
+    model: 'Pavilion 15',
+    monthlySales: 8,
+    minStock: 5,
+    location: 'Warehouse A - Shelf 5',
+    lastEntryDate: '2026-04-10',
+  },
+  4: {
+    sku: 'SNY-WH1000-BK',
+    provider: 'TechSupply SA',
+    model: 'WH-1000XM5',
+    monthlySales: 24,
+    minStock: 5,
+    location: 'Warehouse B - Shelf 1',
+    lastEntryDate: '2026-04-22',
+    description:
+      'Premium wireless headphones with active noise cancellation and long battery life.',
+  },
+};
+
+export const productsMockData: ProductViewModel[] = baseProducts.map((product) => {
+  const baseViewModel = toProductViewModel(product);
+  return {
+    ...baseViewModel,
+    ...mockExtras[product.id],
+  };
+});
