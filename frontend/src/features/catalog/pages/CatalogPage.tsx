@@ -84,6 +84,16 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
   const canDeleteSelected =
     selectedItem !== null && selectedItem.productsCount === 0 && !isDeleting;
 
+  const syncCatalogRoute = useCallback(
+    (next: Partial<CatalogRouteState>) => {
+      onRouteStateChange({
+        page: next.page ?? page,
+        q: next.q ?? searchQuery,
+      });
+    },
+    [onRouteStateChange, page, searchQuery],
+  );
+
   const getProductsFilter = useCallback(
     (name: string): ProductQueryParams =>
       mode === 'brands' ? { brand: name } : { category: name },
@@ -123,11 +133,13 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
 
       if (response.totalPages === 0 && page !== 1) {
         setPage(1);
+        syncCatalogRoute({ page: 1 });
         return;
       }
 
       if (response.totalPages > 0 && page > response.totalPages) {
         setPage(response.totalPages);
+        syncCatalogRoute({ page: response.totalPages });
         return;
       }
 
@@ -170,7 +182,14 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
     } finally {
       setIsListLoading(false);
     }
-  }, [fetchProductsCountByName, mode, page, pluralLabel, searchQuery]);
+  }, [
+    fetchProductsCountByName,
+    mode,
+    page,
+    pluralLabel,
+    searchQuery,
+    syncCatalogRoute,
+  ]);
 
   const openCreateModal = () => {
     setActionError(null);
@@ -219,6 +238,7 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
         closeFormModal();
         setSearchInput('');
         setSearchQuery('');
+        syncCatalogRoute({ page: 1, q: '' });
         if (page !== 1) {
           setPage(1);
         } else {
@@ -344,27 +364,19 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
   }, [selectedItem]);
 
   useEffect(() => {
-    if (page !== routeState.page) setPage(routeState.page);
-    if (searchQuery !== routeState.q) setSearchQuery(routeState.q);
-    if (searchInput !== routeState.q) setSearchInput(routeState.q);
-  }, [page, routeState.page, routeState.q, searchInput, searchQuery]);
+    setPage((current) => (current === routeState.page ? current : routeState.page));
+    setSearchQuery((current) => (current === routeState.q ? current : routeState.q));
+    setSearchInput((current) => (current === routeState.q ? current : routeState.q));
+  }, [routeState.page, routeState.q]);
 
   useEffect(() => {
-    if (page === routeState.page && searchQuery === routeState.q) return;
-    onRouteStateChange({ page, q: searchQuery });
-  }, [onRouteStateChange, page, routeState.page, routeState.q, searchQuery]);
-
-  useEffect(() => {
-    setPage(routeState.page);
-    setSearchInput(routeState.q);
-    setSearchQuery(routeState.q);
     setSelectedItem(null);
     setDetailProducts([]);
     setActionError(null);
     setActionSuccess(null);
     setIsFormOpen(false);
     setFormName('');
-  }, [mode, routeState.page, routeState.q]);
+  }, [mode]);
 
   useEffect(() => {
     void fetchCatalogItems();
@@ -404,8 +416,13 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
                 onChange={(event) => setSearchInput(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
-                    setSearchQuery(searchInput.trim());
+                    const nextQuery = searchInput.trim();
+                    setSearchQuery(nextQuery);
                     setPage(1);
+                    syncCatalogRoute({
+                      q: nextQuery,
+                      page: 1,
+                    });
                   }
                 }}
               />
@@ -417,8 +434,13 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
               type="button"
               className="btn btn-primary"
               onClick={() => {
-                setSearchQuery(searchInput.trim());
+                const nextQuery = searchInput.trim();
+                setSearchQuery(nextQuery);
                 setPage(1);
+                syncCatalogRoute({
+                  q: nextQuery,
+                  page: 1,
+                });
               }}
             >
               Buscar
@@ -430,6 +452,10 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
                 setSearchInput('');
                 setSearchQuery('');
                 setPage(1);
+                syncCatalogRoute({
+                  q: '',
+                  page: 1,
+                });
               }}
             >
               Limpiar
@@ -510,7 +536,11 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
               <button
                 type="button"
                 className={`pagination-btn${page <= 1 ? ' pagination-btn--disabled' : ''}`}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                onClick={() => {
+                  const nextPage = Math.max(1, page - 1);
+                  setPage(nextPage);
+                  syncCatalogRoute({ page: nextPage });
+                }}
                 disabled={page <= 1}
               >
                 Anterior
@@ -529,7 +559,10 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
                       <button
                         type="button"
                         className={`pagination-page${page === visiblePage ? ' pagination-page--active' : ''}`}
-                        onClick={() => setPage(visiblePage)}
+                        onClick={() => {
+                          setPage(visiblePage);
+                          syncCatalogRoute({ page: visiblePage });
+                        }}
                       >
                         {visiblePage}
                       </button>
@@ -540,11 +573,11 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
               <button
                 type="button"
                 className={`pagination-btn${page >= totalPages ? ' pagination-btn--disabled' : ''}`}
-                onClick={() =>
-                  setPage((current) =>
-                    totalPages === 0 ? 1 : Math.min(totalPages, current + 1),
-                  )
-                }
+                onClick={() => {
+                  const nextPage = totalPages === 0 ? 1 : Math.min(totalPages, page + 1);
+                  setPage(nextPage);
+                  syncCatalogRoute({ page: nextPage });
+                }}
                 disabled={page >= totalPages}
               >
                 Siguiente

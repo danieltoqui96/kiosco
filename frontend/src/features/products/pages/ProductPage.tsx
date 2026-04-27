@@ -83,6 +83,28 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     [products],
   );
 
+  const syncProductRoute = useCallback(
+    (next: Partial<ProductRouteState>) => {
+      onRouteStateChange({
+        page: next.page ?? page,
+        search: next.search ?? searchFilter,
+        brand: next.brand ?? brandFilter,
+        category: next.category ?? categoryFilter,
+        status: next.status ?? statusFilter,
+        codebar: next.codebar ?? barcodeQuery,
+      });
+    },
+    [
+      barcodeQuery,
+      brandFilter,
+      categoryFilter,
+      onRouteStateChange,
+      page,
+      searchFilter,
+      statusFilter,
+    ],
+  );
+
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -102,11 +124,13 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
 
       if (response.totalPages === 0 && page !== 1) {
         setPage(1);
+        syncProductRoute({ page: 1 });
         return;
       }
 
       if (response.totalPages > 0 && page > response.totalPages) {
         setPage(response.totalPages);
+        syncProductRoute({ page: response.totalPages });
         return;
       }
 
@@ -124,67 +148,41 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     } finally {
       setIsLoading(false);
     }
-  }, [brandFilter, categoryFilter, page, searchFilter, statusFilter]);
+  }, [
+    brandFilter,
+    categoryFilter,
+    page,
+    searchFilter,
+    statusFilter,
+    syncProductRoute,
+  ]);
 
   useEffect(() => {
     void fetchProducts();
   }, [fetchProducts]);
 
   useEffect(() => {
-    if (page !== routeState.page) setPage(routeState.page);
-    if (searchFilter !== routeState.search) setSearchFilter(routeState.search);
-    if (brandFilter !== routeState.brand) setBrandFilter(routeState.brand);
-    if (categoryFilter !== routeState.category) setCategoryFilter(routeState.category);
-    if (statusFilter !== routeState.status) setStatusFilter(routeState.status);
-    if (barcodeQuery !== routeState.codebar) setBarcodeQuery(routeState.codebar);
+    setPage((current) => (current === routeState.page ? current : routeState.page));
+    setSearchFilter((current) =>
+      current === routeState.search ? current : routeState.search,
+    );
+    setBrandFilter((current) => (current === routeState.brand ? current : routeState.brand));
+    setCategoryFilter((current) =>
+      current === routeState.category ? current : routeState.category,
+    );
+    setStatusFilter((current) =>
+      current === routeState.status ? current : routeState.status,
+    );
+    setBarcodeQuery((current) =>
+      current === routeState.codebar ? current : routeState.codebar,
+    );
   }, [
-    barcodeQuery,
-    brandFilter,
-    categoryFilter,
-    page,
     routeState.brand,
     routeState.category,
     routeState.codebar,
     routeState.page,
     routeState.search,
     routeState.status,
-    searchFilter,
-    statusFilter,
-  ]);
-
-  useEffect(() => {
-    const isAlreadySyncedWithRoute =
-      page === routeState.page &&
-      searchFilter === routeState.search &&
-      brandFilter === routeState.brand &&
-      categoryFilter === routeState.category &&
-      statusFilter === routeState.status &&
-      barcodeQuery === routeState.codebar;
-
-    if (isAlreadySyncedWithRoute) return;
-
-    onRouteStateChange({
-      page,
-      search: searchFilter,
-      brand: brandFilter,
-      category: categoryFilter,
-      status: statusFilter,
-      codebar: barcodeQuery,
-    });
-  }, [
-    barcodeQuery,
-    brandFilter,
-    categoryFilter,
-    onRouteStateChange,
-    page,
-    routeState.brand,
-    routeState.category,
-    routeState.codebar,
-    routeState.page,
-    routeState.search,
-    routeState.status,
-    searchFilter,
-    statusFilter,
   ]);
 
   const fetchCatalogs = useCallback(async () => {
@@ -215,10 +213,16 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     setBarcodeQuery(normalizedValue);
     setErrorMessage(null);
     setSuccessMessage(null);
+    syncProductRoute({ codebar: normalizedValue });
 
     if (!normalizedValue) {
       setSearchFilter('');
       setPage(1);
+      syncProductRoute({
+        codebar: '',
+        search: '',
+        page: 1,
+      });
       return;
     }
 
@@ -234,12 +238,22 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
       setSelectedProductId(product.id);
       setIsDetailOpen(true);
       setSearchFilter(normalizedValue);
+      syncProductRoute({
+        codebar: normalizedValue,
+        search: normalizedValue,
+        page: 1,
+      });
       setSuccessMessage('Producto encontrado por codigo de barras.');
     } catch (error) {
       if (error instanceof ApiClientError && error.statusCode === 404) {
         setSelectedProductId(null);
         setSearchFilter(normalizedValue);
         setPage(1);
+        syncProductRoute({
+          codebar: normalizedValue,
+          search: normalizedValue,
+          page: 1,
+        });
         setErrorMessage('No existe ese codigo de barras. Mostrando resultados de busqueda.');
       } else {
         const message =
@@ -258,6 +272,14 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     setCategoryFilter('');
     setStatusFilter('');
     setPage(1);
+    syncProductRoute({
+      codebar: '',
+      search: '',
+      brand: '',
+      category: '',
+      status: '',
+      page: 1,
+    });
     setErrorMessage(null);
     setSuccessMessage('Filtros limpiados.');
   };
@@ -358,6 +380,14 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
         setBrandFilter('');
         setCategoryFilter('');
         setStatusFilter('');
+        syncProductRoute({
+          codebar: '',
+          search: '',
+          brand: '',
+          category: '',
+          status: '',
+          page: 1,
+        });
 
         if (page !== 1) {
           setPage(1);
@@ -472,8 +502,13 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
                 className="filter-select"
                 value={brandFilter}
                 onChange={(event) => {
-                  setBrandFilter(event.target.value);
+                  const nextBrand = event.target.value;
+                  setBrandFilter(nextBrand);
                   setPage(1);
+                  syncProductRoute({
+                    brand: nextBrand,
+                    page: 1,
+                  });
                 }}
               >
                 <option value="">Todas</option>
@@ -494,8 +529,13 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
                 className="filter-select"
                 value={categoryFilter}
                 onChange={(event) => {
-                  setCategoryFilter(event.target.value);
+                  const nextCategory = event.target.value;
+                  setCategoryFilter(nextCategory);
                   setPage(1);
+                  syncProductRoute({
+                    category: nextCategory,
+                    page: 1,
+                  });
                 }}
               >
                 <option value="">Todas</option>
@@ -519,8 +559,13 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
                 className="filter-select"
                 value={statusFilter}
                 onChange={(event) => {
-                  setStatusFilter(event.target.value as '' | 'true' | 'false');
+                  const nextStatus = event.target.value as '' | 'true' | 'false';
+                  setStatusFilter(nextStatus);
                   setPage(1);
+                  syncProductRoute({
+                    status: nextStatus,
+                    page: 1,
+                  });
                 }}
               >
                 <option value="">Todos</option>
@@ -558,16 +603,21 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
               ? 'No hay productos que coincidan con los filtros.'
               : 'Aun no hay productos disponibles.'
           }
-          onPrevPage={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-          onNextPage={() =>
-            setPage((currentPage) =>
-              totalPages === 0 ? 1 : Math.min(totalPages, currentPage + 1),
-            )
-          }
+          onPrevPage={() => {
+            const nextPage = Math.max(1, page - 1);
+            setPage(nextPage);
+            syncProductRoute({ page: nextPage });
+          }}
+          onNextPage={() => {
+            const nextPage = totalPages === 0 ? 1 : Math.min(totalPages, page + 1);
+            setPage(nextPage);
+            syncProductRoute({ page: nextPage });
+          }}
           onGoToPage={(nextPage) => {
             if (nextPage < 1) return;
             if (totalPages !== 0 && nextPage > totalPages) return;
             setPage(nextPage);
+            syncProductRoute({ page: nextPage });
           }}
         />
       </main>
