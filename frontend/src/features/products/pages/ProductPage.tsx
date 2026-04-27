@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import '../styles/products.css';
+import { productsApi } from '../api/products.api';
 import { BarcodeSearch } from '../components/BarcodeSearch';
 import { ProductDetails } from '../components/ProductDetails';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductTable } from '../components/ProductTable';
-import { productsMockData } from '../mockData';
 import { toProductViewModel } from '../presentation.utils';
 import type { ProductFormValues, ProductModalState, ProductViewModel } from '../types';
 
@@ -17,17 +17,19 @@ const defaultModalState: ProductModalState = {
 };
 
 export const ProductPage = () => {
-  const [products, setProducts] = useState<ProductViewModel[]>(productsMockData);
-  const [selectedProductId, setSelectedProductId] = useState<number | null>(
-    productsMockData[0]?.id ?? null,
-  );
+  const [products, setProducts] = useState<ProductViewModel[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [barcodeQuery, setBarcodeQuery] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | 'true' | 'false'>('');
   const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [modalState, setModalState] = useState<ProductModalState>(defaultModalState);
 
   const brandOptions = useMemo(
@@ -40,31 +42,52 @@ export const ProductPage = () => {
     [products],
   );
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesSearch =
-        searchFilter.trim().length === 0 ||
-        product.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        product.codebar.toLowerCase().includes(searchFilter.toLowerCase());
-      const matchesBrand = brandFilter.length === 0 || product.brand === brandFilter;
-      const matchesCategory =
-        categoryFilter.length === 0 || product.category === categoryFilter;
-      const matchesStatus =
-        statusFilter.length === 0 || String(product.isActive) === statusFilter;
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
 
-      return matchesSearch && matchesBrand && matchesCategory && matchesStatus;
-    });
-  }, [products, searchFilter, brandFilter, categoryFilter, statusFilter]);
+    try {
+      const response = await productsApi.getAll({
+        page,
+        limit: DEFAULT_PAGE_SIZE,
+        search: searchFilter || undefined,
+        brand: brandFilter || undefined,
+        category: categoryFilter || undefined,
+        isActive:
+          statusFilter.length === 0
+            ? undefined
+            : statusFilter === 'true',
+      });
 
-  const totalItems = filteredProducts.length;
-  const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / DEFAULT_PAGE_SIZE);
-  const effectivePage = totalPages === 0 ? 1 : Math.min(page, totalPages);
+      if (response.totalPages === 0 && page !== 1) {
+        setPage(1);
+        return;
+      }
 
-  const paginatedProducts = useMemo(() => {
-    const start = (effectivePage - 1) * DEFAULT_PAGE_SIZE;
-    const end = start + DEFAULT_PAGE_SIZE;
-    return filteredProducts.slice(start, end);
-  }, [effectivePage, filteredProducts]);
+      if (response.totalPages > 0 && page > response.totalPages) {
+        setPage(response.totalPages);
+        return;
+      }
+
+      const viewModels = response.items.map(toProductViewModel);
+      setProducts(viewModels);
+      setTotalItems(response.total);
+      setTotalPages(response.totalPages);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to load products.';
+      setErrorMessage(message);
+      setProducts([]);
+      setTotalItems(0);
+      setTotalPages(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [brandFilter, categoryFilter, page, searchFilter, statusFilter]);
+
+  useEffect(() => {
+    void fetchProducts();
+  }, [fetchProducts]);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -128,51 +151,18 @@ export const ProductPage = () => {
   const handleDelete = (productId: number) => {
     const product = products.find((item) => item.id === productId);
     if (!product) return;
-
-    const shouldDelete = window.confirm(
-      `Do you want to delete "${product.name}"?`,
+    window.alert(
+      `Delete flow for "${product.name}" will be connected in Stage 3.`,
     );
-    if (!shouldDelete) return;
-
-    setProducts((currentProducts) =>
-      currentProducts.filter((item) => item.id !== productId),
-    );
-
-    if (selectedProductId === productId) {
-      setSelectedProductId(null);
-    }
   };
 
   const handleSubmitProduct = (values: ProductFormValues) => {
-    if (modalState.mode === 'create') {
-      const nextId =
-        products.reduce((maxId, product) => Math.max(maxId, product.id), 0) + 1;
-      const newProduct = toProductViewModel({ id: nextId, ...values });
-
-      setProducts((currentProducts) => [newProduct, ...currentProducts]);
-      setSelectedProductId(newProduct.id);
-      setIsDetailOpen(true);
-      setModalState(defaultModalState);
-      setPage(1);
-      return;
-    }
-
-    if (!modalState.editingProductId) {
-      setModalState(defaultModalState);
-      return;
-    }
-
-    setProducts((currentProducts) =>
-      currentProducts.map((product) => {
-        if (product.id !== modalState.editingProductId) return product;
-
-        return {
-          ...product,
-          ...toProductViewModel({ id: product.id, ...values }),
-        };
-      }),
+    void values;
+    window.alert(
+      modalState.mode === 'create'
+        ? 'Create flow will be connected in Stage 3.'
+        : 'Edit flow will be connected in Stage 3.',
     );
-
     setModalState(defaultModalState);
   };
 
@@ -200,7 +190,10 @@ export const ProductPage = () => {
           value={barcodeQuery}
           onChange={setBarcodeQuery}
           onSearch={handleSearch}
+          isLoading={isLoading}
         />
+
+        {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
 
         <section className="filters-bar">
           <div className="filters-group">
@@ -277,13 +270,13 @@ export const ProductPage = () => {
               Clear filters
             </button>
             <span className="results-count">
-              Showing {paginatedProducts.length} of {totalItems} products
+              Showing {products.length} of {totalItems} products
             </span>
           </div>
         </section>
 
         <ProductTable
-          products={paginatedProducts}
+          products={products}
           selectedProductId={selectedProductId}
           onSelectProduct={handleSelectProduct}
           onViewProduct={(productId) => {
@@ -292,10 +285,11 @@ export const ProductPage = () => {
           }}
           onEditProduct={handleOpenEdit}
           onDeleteProduct={handleDelete}
-          currentPage={effectivePage}
+          currentPage={page}
           totalPages={totalPages}
           totalItems={totalItems}
           pageSize={DEFAULT_PAGE_SIZE}
+          isLoading={isLoading}
           onPrevPage={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
           onNextPage={() =>
             setPage((currentPage) =>
