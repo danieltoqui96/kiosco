@@ -90,3 +90,20 @@
   padding-top: 6px;
   padding-bottom: 6px;
 }
+
+/* Detail panel layout after removing product image */
+.detail-hero {
+  display: block;
+}
+
+.detail-header-info {
+  width: 100%;
+}
+
+.detail-header-info .status-badge {
+  align-self: flex-start;
+}
+
+.detail-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}

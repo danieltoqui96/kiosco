@@ -18,6 +18,26 @@ const defaultModalState: ProductModalState = {
   editingProductId: null,
 };
 
+function buildUpdatePayload(
+  nextValues: ProductFormValues,
+  currentValues: ProductFormValues,
+): Partial<ProductFormValues> {
+  const payload: Partial<ProductFormValues> = {};
+
+  if (nextValues.codebar !== currentValues.codebar) payload.codebar = nextValues.codebar;
+  if (nextValues.name !== currentValues.name) payload.name = nextValues.name;
+  if (nextValues.brand !== currentValues.brand) payload.brand = nextValues.brand;
+  if (nextValues.category !== currentValues.category) payload.category = nextValues.category;
+  if (nextValues.salePrice !== currentValues.salePrice) payload.salePrice = nextValues.salePrice;
+  if (nextValues.purchasePrice !== currentValues.purchasePrice) {
+    payload.purchasePrice = nextValues.purchasePrice;
+  }
+  if (nextValues.stock !== currentValues.stock) payload.stock = nextValues.stock;
+  if (nextValues.isActive !== currentValues.isActive) payload.isActive = nextValues.isActive;
+
+  return payload;
+}
+
 export const ProductPage = () => {
   const [products, setProducts] = useState<ProductViewModel[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
@@ -195,6 +215,11 @@ export const ProductPage = () => {
     });
   };
 
+  const closeProductModal = () => {
+    setFormInitialValues(null);
+    setModalState(defaultModalState);
+  };
+
   const handleOpenEdit = (productId: number) => {
     const product = products.find((item) => item.id === productId);
     if (!product) {
@@ -264,8 +289,7 @@ export const ProductPage = () => {
 
         setSelectedProductId(createdProduct.id);
         setIsDetailOpen(true);
-        setFormInitialValues(null);
-        setModalState(defaultModalState);
+        closeProductModal();
         setBarcodeQuery('');
         setSearchFilter('');
         setBrandFilter('');
@@ -288,14 +312,47 @@ export const ProductPage = () => {
         return;
       }
 
-      const updatedProduct = await productsApi.update(modalState.editingProductId, values);
-      setSelectedProductId(updatedProduct.id);
-      setIsDetailOpen(true);
-      setFormInitialValues(null);
-      setModalState(defaultModalState);
-      await fetchProducts();
-      void fetchCatalogs();
-      setSuccessMessage(`Producto "${updatedProduct.name}" actualizado.`);
+      if (!formInitialValues) {
+        setErrorMessage('No se pudieron preparar los datos de edicion.');
+        return;
+      }
+
+      const updatePayload = buildUpdatePayload(values, formInitialValues);
+
+      if (Object.keys(updatePayload).length === 0) {
+        closeProductModal();
+        setSuccessMessage('No habia cambios para guardar.');
+        return;
+      }
+
+      try {
+        const updatedProduct = await productsApi.update(
+          modalState.editingProductId,
+          updatePayload,
+        );
+        setSelectedProductId(updatedProduct.id);
+        setIsDetailOpen(true);
+        closeProductModal();
+        await fetchProducts();
+        void fetchCatalogs();
+        setSuccessMessage(`Producto "${updatedProduct.name}" actualizado.`);
+      } catch (updateError) {
+        if (updateError instanceof ApiClientError && updateError.statusCode === 404) {
+          const existingProduct = await productsApi
+            .getById(modalState.editingProductId)
+            .catch(() => null);
+
+          if (existingProduct) {
+            setSelectedProductId(existingProduct.id);
+            setIsDetailOpen(true);
+            closeProductModal();
+            await fetchProducts();
+            setSuccessMessage('Cambios procesados correctamente.');
+            return;
+          }
+        }
+        throw updateError;
+      }
     } catch (error) {
       const message =
         error instanceof Error
@@ -468,10 +525,7 @@ export const ProductPage = () => {
         mode={modalState.mode}
         initialValues={formInitialValues}
         isSubmitting={isSubmitting}
-        onClose={() => {
-          setFormInitialValues(null);
-          setModalState(defaultModalState);
-        }}
+        onClose={closeProductModal}
         onSubmit={(values) => {
           void handleSubmitProduct(values);
         }}
