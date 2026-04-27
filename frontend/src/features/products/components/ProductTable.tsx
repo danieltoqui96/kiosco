@@ -16,6 +16,7 @@ interface ProductTableProps {
   onNextPage: () => void;
   onGoToPage: (page: number) => void;
   isLoading?: boolean;
+  emptyMessage?: string;
 }
 
 function getStockClass(stockStatus: ProductViewModel['stockStatus']): string {
@@ -51,6 +52,7 @@ export const ProductTable = ({
   onNextPage,
   onGoToPage,
   isLoading = false,
+  emptyMessage = 'No products found.',
 }: ProductTableProps) => {
   const visiblePages = buildVisiblePages(currentPage, totalPages);
   const rangeStart = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
@@ -88,7 +90,7 @@ export const ProductTable = ({
           ) : products.length === 0 ? (
             <tr className="table-row">
               <td className="table-cell" colSpan={8}>
-                No products found.
+                {emptyMessage}
               </td>
             </tr>
           ) : (
@@ -152,6 +154,7 @@ export const ProductTable = ({
                         className="action-btn action-btn--view"
                         title="View details"
                         onClick={() => onViewProduct(product.id)}
+                        aria-label={`View details for ${product.name}`}
                       >
                         <span className="action-icon">V</span>
                       </button>
@@ -160,6 +163,7 @@ export const ProductTable = ({
                         className="action-btn action-btn--edit"
                         title="Edit product"
                         onClick={() => onEditProduct(product.id)}
+                        aria-label={`Edit ${product.name}`}
                       >
                         <span className="action-icon">E</span>
                       </button>
@@ -168,6 +172,7 @@ export const ProductTable = ({
                         className="action-btn action-btn--delete"
                         title="Delete product"
                         onClick={() => onDeleteProduct(product.id)}
+                        aria-label={`Delete ${product.name}`}
                       >
                         <span className="action-icon">D</span>
                       </button>

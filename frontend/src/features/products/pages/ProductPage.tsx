@@ -26,6 +26,7 @@ export const ProductPage = () => {
   const [isBarcodeSearching, setIsBarcodeSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [barcodeQuery, setBarcodeQuery] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
@@ -37,6 +38,11 @@ export const ProductPage = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [modalState, setModalState] = useState<ProductModalState>(defaultModalState);
+  const hasActiveFilters =
+    searchFilter.trim().length > 0 ||
+    brandFilter.trim().length > 0 ||
+    categoryFilter.trim().length > 0 ||
+    statusFilter.trim().length > 0;
 
   const fallbackBrandOptions = useMemo(
     () => Array.from(new Set(products.map((product) => product.brand))).sort(),
@@ -141,6 +147,7 @@ export const ProductPage = () => {
     const normalizedValue = value.trim();
     setBarcodeQuery(normalizedValue);
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     if (!normalizedValue) {
       setSearchFilter('');
@@ -160,6 +167,7 @@ export const ProductPage = () => {
       setSelectedProductId(product.id);
       setIsDetailOpen(true);
       setSearchFilter(normalizedValue);
+      setSuccessMessage('Product found by barcode.');
     } catch (error) {
       if (error instanceof ApiClientError && error.statusCode === 404) {
         setSelectedProductId(null);
@@ -183,6 +191,8 @@ export const ProductPage = () => {
     setCategoryFilter('');
     setStatusFilter('');
     setPage(1);
+    setErrorMessage(null);
+    setSuccessMessage('Filters cleared.');
   };
 
   const handleSelectProduct = (productId: number) => {
@@ -191,6 +201,8 @@ export const ProductPage = () => {
   };
 
   const handleOpenCreate = () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
     setModalState({
       isOpen: true,
       mode: 'create',
@@ -199,6 +211,8 @@ export const ProductPage = () => {
   };
 
   const handleOpenEdit = (productId: number) => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
     setModalState({
       isOpen: true,
       mode: 'edit',
@@ -216,6 +230,7 @@ export const ProductPage = () => {
     if (!shouldDelete) return;
 
     setErrorMessage(null);
+    setSuccessMessage(null);
     setIsLoading(true);
 
     try {
@@ -226,6 +241,7 @@ export const ProductPage = () => {
       }
 
       await fetchProducts();
+      setSuccessMessage(`Product "${product.name}" was deleted.`);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to delete product.';
@@ -238,6 +254,7 @@ export const ProductPage = () => {
   const handleSubmitProduct = async (values: ProductFormValues) => {
     setIsSubmitting(true);
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     try {
       if (modalState.mode === 'create') {
@@ -259,6 +276,7 @@ export const ProductPage = () => {
         }
 
         void fetchCatalogs();
+        setSuccessMessage(`Product "${createdProduct.name}" was created.`);
         return;
       }
 
@@ -273,6 +291,7 @@ export const ProductPage = () => {
       setModalState(defaultModalState);
       await fetchProducts();
       void fetchCatalogs();
+      setSuccessMessage(`Product "${updatedProduct.name}" was updated.`);
     } catch (error) {
       const message =
         error instanceof Error
@@ -316,6 +335,7 @@ export const ProductPage = () => {
         />
 
         {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
+        {successMessage ? <p className="form-success">{successMessage}</p> : null}
 
         <section className="filters-bar">
           <div className="filters-group">
@@ -417,6 +437,11 @@ export const ProductPage = () => {
           totalItems={totalItems}
           pageSize={DEFAULT_PAGE_SIZE}
           isLoading={isLoading}
+          emptyMessage={
+            hasActiveFilters
+              ? 'No products match the current filters.'
+              : 'No products available yet.'
+          }
           onPrevPage={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
           onNextPage={() =>
             setPage((currentPage) =>

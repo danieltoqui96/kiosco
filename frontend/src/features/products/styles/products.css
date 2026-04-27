@@ -5,3 +5,12 @@
   Product feature styles are loaded from this module-level stylesheet.
   In Stage 2/3 we can move rules from src/styles/index.css into this file incrementally.
 */
+
+.form-success {
+  color: var(--color-success);
+  background-color: var(--color-success-bg);
+  border: 1px solid color-mix(in srgb, var(--color-success) 35%, white);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  padding: var(--space-sm) var(--space-md);
+}
