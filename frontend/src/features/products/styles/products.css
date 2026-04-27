@@ -24,6 +24,21 @@
   outline-offset: -2px;
 }
 
+/* Typography consistency within products module */
+.main-content,
+.main-content button,
+.main-content input,
+.main-content select,
+.main-content textarea {
+  font-family: var(--font-family);
+}
+
+.main-content .btn,
+.main-content .filter-select,
+.main-content .scanner-input {
+  font-size: 0.875rem;
+}
+
 /* Compact layout for products search + filters to show more rows */
 .main-content {
   gap: var(--space-md);

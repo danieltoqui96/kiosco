@@ -46,7 +46,7 @@ export const BarcodeSearch = ({
           placeholder={placeholder}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          aria-label="Barcode or product search"
+          aria-label="Busqueda de producto por codigo de barras"
         />
 
         <button type="submit" className="scanner-btn" disabled={isLoading}>

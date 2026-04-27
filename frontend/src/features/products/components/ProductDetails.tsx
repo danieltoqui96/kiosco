@@ -50,9 +50,6 @@ export const ProductDetails = ({
         ) : (
           <>
             <div className="detail-hero">
-              <div className="detail-image">
-                <span className="detail-image-placeholder">PR</span>
-              </div>
               <div className="detail-header-info">
                 <span className={getStatusBadgeClass(product.statusLabel)}>
                   {product.statusLabel}
@@ -71,9 +68,7 @@ export const ProductDetails = ({
               </div>
               <div className="stat-card">
                 <span className="stat-label">Stock</span>
-                <span className="stat-value stat-value--stock">
-                  {product.stock} unidades
-                </span>
+                <span className="stat-value">{product.stock} unidades</span>
               </div>
             </div>
 

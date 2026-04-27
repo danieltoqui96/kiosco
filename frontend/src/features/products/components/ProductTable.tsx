@@ -51,6 +51,7 @@ export const ProductTable = ({
       <table className="data-table">
         <thead className="table-header">
           <tr>
+            <th className="table-cell table-cell--header">ID</th>
             <th className="table-cell table-cell--header">Codigo</th>
             <th className="table-cell table-cell--header">Producto</th>
             <th className="table-cell table-cell--header">Marca</th>
@@ -68,13 +69,13 @@ export const ProductTable = ({
         <tbody className="table-body">
           {isLoading ? (
             <tr className="table-row">
-              <td className="table-cell" colSpan={7}>
+              <td className="table-cell" colSpan={8}>
                 Cargando productos...
               </td>
             </tr>
           ) : products.length === 0 ? (
             <tr className="table-row">
-              <td className="table-cell" colSpan={7}>
+              <td className="table-cell" colSpan={8}>
                 {emptyMessage}
               </td>
             </tr>
@@ -94,6 +95,7 @@ export const ProductTable = ({
                   }}
                   tabIndex={0}
                 >
+                  <td className="table-cell table-cell--number">{product.id}</td>
                   <td className="table-cell table-cell--code">{product.codebar}</td>
 
                   <td className="table-cell">
