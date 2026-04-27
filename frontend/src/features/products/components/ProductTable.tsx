@@ -120,9 +120,7 @@ export const ProductTable = ({
                       </div>
                       <div className="product-info">
                         <span className="product-name">{product.name}</span>
-                        <span className="product-sku">
-                          {product.sku ?? `ID: ${product.id}`}
-                        </span>
+                        <span className="product-sku">{product.brand}</span>
                       </div>
                     </div>
                   </td>

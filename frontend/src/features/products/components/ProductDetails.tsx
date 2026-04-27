@@ -58,7 +58,7 @@ export const ProductDetails = ({
                   {product.statusLabel}
                 </span>
                 <h3 className="detail-title">{product.name}</h3>
-                <p className="detail-sku">{product.sku ?? `ID: ${product.id}`}</p>
+                <p className="detail-sku">ID: {product.id}</p>
               </div>
             </div>
 
@@ -74,10 +74,6 @@ export const ProductDetails = ({
                 <span className="stat-value stat-value--stock">
                   {product.stock} units
                 </span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">Monthly Sales</span>
-                <span className="stat-value">{product.monthlySales ?? '-'}</span>
               </div>
             </div>
 
@@ -95,14 +91,6 @@ export const ProductDetails = ({
                 <div className="info-row">
                   <dt className="info-label">Brand</dt>
                   <dd className="info-value">{product.brand}</dd>
-                </div>
-                <div className="info-row">
-                  <dt className="info-label">Model</dt>
-                  <dd className="info-value">{product.model ?? '-'}</dd>
-                </div>
-                <div className="info-row">
-                  <dt className="info-label">Provider</dt>
-                  <dd className="info-value">{product.provider ?? '-'}</dd>
                 </div>
               </dl>
             </div>
@@ -136,28 +124,7 @@ export const ProductDetails = ({
                   <dt className="info-label">Current Stock</dt>
                   <dd className="info-value">{product.stock} units</dd>
                 </div>
-                <div className="info-row">
-                  <dt className="info-label">Minimum Stock</dt>
-                  <dd className="info-value">
-                    {product.minStock !== undefined ? `${product.minStock} units` : '-'}
-                  </dd>
-                </div>
-                <div className="info-row">
-                  <dt className="info-label">Location</dt>
-                  <dd className="info-value">{product.location ?? '-'}</dd>
-                </div>
-                <div className="info-row">
-                  <dt className="info-label">Last Entry</dt>
-                  <dd className="info-value">{product.lastEntryDate ?? '-'}</dd>
-                </div>
               </dl>
-            </div>
-
-            <div className="detail-section">
-              <h4 className="section-title">Description</h4>
-              <p className="detail-description">
-                {product.description ?? 'No description available for this product.'}
-              </p>
             </div>
           </>
         )}

@@ -70,42 +70,4 @@ const baseProducts: Product[] = [
   },
 ];
 
-const mockExtras: Record<number, Partial<ProductViewModel>> = {
-  1: {
-    sku: 'SAM-A54-128',
-    provider: 'TechSupply SA',
-    model: 'A54',
-    monthlySales: 31,
-    minStock: 8,
-    location: 'Warehouse A - Shelf 2',
-    lastEntryDate: '2026-03-15',
-  },
-  2: {
-    sku: 'HP-PAV15-512',
-    provider: 'Distribuidora Norte',
-    model: 'Pavilion 15',
-    monthlySales: 8,
-    minStock: 5,
-    location: 'Warehouse A - Shelf 5',
-    lastEntryDate: '2026-04-10',
-  },
-  4: {
-    sku: 'SNY-WH1000-BK',
-    provider: 'TechSupply SA',
-    model: 'WH-1000XM5',
-    monthlySales: 24,
-    minStock: 5,
-    location: 'Warehouse B - Shelf 1',
-    lastEntryDate: '2026-04-22',
-    description:
-      'Premium wireless headphones with active noise cancellation and long battery life.',
-  },
-};
-
-export const productsMockData: ProductViewModel[] = baseProducts.map((product) => {
-  const baseViewModel = toProductViewModel(product);
-  return {
-    ...baseViewModel,
-    ...mockExtras[product.id],
-  };
-});
+export const productsMockData: ProductViewModel[] = baseProducts.map(toProductViewModel);

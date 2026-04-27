@@ -91,16 +91,4 @@ export interface ProductModalState {
   editingProductId: number | null;
 }
 
-// Fields kept only for visual parity with the original mock until API support exists.
-export interface ProductMockExtras {
-  sku?: string;
-  provider?: string;
-  model?: string;
-  monthlySales?: number;
-  minStock?: number;
-  location?: string;
-  lastEntryDate?: string;
-  description?: string;
-}
-
-export type ProductViewModel = Product & ProductUiDerived & ProductMockExtras;
+export type ProductViewModel = Product & ProductUiDerived;
