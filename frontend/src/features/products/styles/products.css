@@ -14,3 +14,12 @@
   font-size: 0.875rem;
   padding: var(--space-sm) var(--space-md);
 }
+
+.table-row--clickable {
+  cursor: pointer;
+}
+
+.table-row--clickable:focus {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: -2px;
+}

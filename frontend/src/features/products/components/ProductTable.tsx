@@ -5,9 +5,6 @@ interface ProductTableProps {
   products: ProductViewModel[];
   selectedProductId: number | null;
   onSelectProduct: (productId: number) => void;
-  onViewProduct: (productId: number) => void;
-  onEditProduct: (productId: number) => void;
-  onDeleteProduct: (productId: number) => void;
   currentPage: number;
   totalPages: number;
   totalItems: number;
@@ -41,9 +38,6 @@ export const ProductTable = ({
   products,
   selectedProductId,
   onSelectProduct,
-  onViewProduct,
-  onEditProduct,
-  onDeleteProduct,
   currentPage,
   totalPages,
   totalItems,
@@ -63,33 +57,29 @@ export const ProductTable = ({
       <table className="data-table">
         <thead className="table-header">
           <tr>
-            <th className="table-cell table-cell--header">Sel</th>
-            <th className="table-cell table-cell--header">Code</th>
-            <th className="table-cell table-cell--header">Product</th>
-            <th className="table-cell table-cell--header">Category</th>
+            <th className="table-cell table-cell--header">Codigo</th>
+            <th className="table-cell table-cell--header">Producto</th>
+            <th className="table-cell table-cell--header">Categoria</th>
             <th className="table-cell table-cell--header table-cell--right">
-              Sale Price
+              Precio
             </th>
             <th className="table-cell table-cell--header table-cell--right">
               Stock
             </th>
-            <th className="table-cell table-cell--header">Status</th>
-            <th className="table-cell table-cell--header table-cell--center">
-              Actions
-            </th>
+            <th className="table-cell table-cell--header">Estado</th>
           </tr>
         </thead>
 
         <tbody className="table-body">
           {isLoading ? (
             <tr className="table-row">
-              <td className="table-cell" colSpan={8}>
-                Loading products...
+              <td className="table-cell" colSpan={6}>
+                Cargando productos...
               </td>
             </tr>
           ) : products.length === 0 ? (
             <tr className="table-row">
-              <td className="table-cell" colSpan={8}>
+              <td className="table-cell" colSpan={6}>
                 {emptyMessage}
               </td>
             </tr>
@@ -99,18 +89,16 @@ export const ProductTable = ({
               return (
                 <tr
                   key={product.id}
-                  className={`table-row${isSelected ? ' table-row--selected' : ''}`}
+                  className={`table-row table-row--clickable${isSelected ? ' table-row--selected' : ''}`}
+                  onClick={() => onSelectProduct(product.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelectProduct(product.id);
+                    }
+                  }}
+                  tabIndex={0}
                 >
-                  <td className="table-cell">
-                    <input
-                      type="checkbox"
-                      className="checkbox"
-                      checked={isSelected}
-                      onChange={() => onSelectProduct(product.id)}
-                      aria-label={`Select product ${product.name}`}
-                    />
-                  </td>
-
                   <td className="table-cell table-cell--code">{product.codebar}</td>
 
                   <td className="table-cell">
@@ -144,38 +132,6 @@ export const ProductTable = ({
                       {product.statusLabel}
                     </span>
                   </td>
-
-                  <td className="table-cell table-cell--center">
-                    <div className="action-buttons">
-                      <button
-                        type="button"
-                        className="action-btn action-btn--view"
-                        title="View details"
-                        onClick={() => onViewProduct(product.id)}
-                        aria-label={`View details for ${product.name}`}
-                      >
-                        <span className="action-icon">V</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="action-btn action-btn--edit"
-                        title="Edit product"
-                        onClick={() => onEditProduct(product.id)}
-                        aria-label={`Edit ${product.name}`}
-                      >
-                        <span className="action-icon">E</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="action-btn action-btn--delete"
-                        title="Delete product"
-                        onClick={() => onDeleteProduct(product.id)}
-                        aria-label={`Delete ${product.name}`}
-                      >
-                        <span className="action-icon">D</span>
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               );
             })
@@ -185,7 +141,7 @@ export const ProductTable = ({
 
       <div className="table-pagination">
         <div className="pagination-info">
-          Showing {rangeStart}-{rangeEnd} of {totalItems} records
+          Mostrando {rangeStart}-{rangeEnd} de {totalItems} registros
         </div>
         <div className="pagination-controls">
           <button
@@ -194,7 +150,7 @@ export const ProductTable = ({
             onClick={onPrevPage}
             disabled={currentPage <= 1}
           >
-            Previous
+            Anterior
           </button>
           <span className="pagination-pages">
             {visiblePages.map((page, index) => {
@@ -222,7 +178,7 @@ export const ProductTable = ({
             onClick={onNextPage}
             disabled={currentPage >= totalPages}
           >
-            Next
+            Siguiente
           </button>
         </div>
       </div>

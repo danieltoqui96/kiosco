@@ -27,17 +27,17 @@ export function getStatusLabel(
   isActive: boolean,
   stockStatus: ProductUiDerived['stockStatus'],
 ): ProductUiDerived['statusLabel'] {
-  if (stockStatus === 'zero') return 'Out of Stock';
-  if (!isActive) return 'Inactive';
-  if (stockStatus === 'low') return 'Low Stock';
-  return 'Active';
+  if (stockStatus === 'zero') return 'Sin stock';
+  if (!isActive) return 'Inactivo';
+  if (stockStatus === 'low') return 'Stock bajo';
+  return 'Activo';
 }
 
 export function getStatusBadgeClass(
   statusLabel: ProductUiDerived['statusLabel'],
 ): string {
-  if (statusLabel === 'Active') return 'status-badge status-badge--active';
-  if (statusLabel === 'Low Stock') return 'status-badge status-badge--warning';
+  if (statusLabel === 'Activo') return 'status-badge status-badge--active';
+  if (statusLabel === 'Stock bajo') return 'status-badge status-badge--warning';
   return 'status-badge status-badge--inactive';
 }
 

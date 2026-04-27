@@ -52,18 +52,18 @@ function getInitialFormValues(
 
 function validate(values: ProductFormValues): ProductFormErrors {
   const errors: ProductFormErrors = {};
-  if (!values.codebar.trim()) errors.codebar = 'Barcode is required.';
-  if (!values.name.trim()) errors.name = 'Name is required.';
-  if (!values.brand.trim()) errors.brand = 'Brand is required.';
-  if (!values.category.trim()) errors.category = 'Category is required.';
+  if (!values.codebar.trim()) errors.codebar = 'El codigo de barras es obligatorio.';
+  if (!values.name.trim()) errors.name = 'El nombre es obligatorio.';
+  if (!values.brand.trim()) errors.brand = 'La marca es obligatoria.';
+  if (!values.category.trim()) errors.category = 'La categoria es obligatoria.';
   if (!Number.isFinite(values.salePrice) || values.salePrice < 0) {
-    errors.salePrice = 'Sale price must be a positive number.';
+    errors.salePrice = 'El precio de venta debe ser un numero positivo.';
   }
   if (!Number.isFinite(values.purchasePrice) || values.purchasePrice < 0) {
-    errors.purchasePrice = 'Purchase price must be a positive number.';
+    errors.purchasePrice = 'El precio de compra debe ser un numero positivo.';
   }
   if (!Number.isFinite(values.stock) || values.stock < 0) {
-    errors.stock = 'Stock must be a positive integer.';
+    errors.stock = 'El stock debe ser un entero positivo.';
   }
   return errors;
 }
@@ -82,7 +82,7 @@ export const ProductFormModal = ({
   const [errors, setErrors] = useState<ProductFormErrors>({});
 
   const title = useMemo(
-    () => (mode === 'create' ? 'Create Product' : 'Edit Product'),
+    () => (mode === 'create' ? 'Agregar producto' : 'Editar producto'),
     [mode],
   );
 
@@ -101,7 +101,7 @@ export const ProductFormModal = ({
       <div className="modal modal--large">
         <div className="modal-header">
           <h3 className="modal-title">{title}</h3>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar">
             x
           </button>
         </div>
@@ -109,11 +109,11 @@ export const ProductFormModal = ({
         <form onSubmit={handleSubmit}>
           <div className="modal-content">
             <fieldset className="form-section">
-              <legend className="form-section-title">General Information</legend>
+              <legend className="form-section-title">Informacion general</legend>
               <div className="form-grid form-grid--2col">
                 <div className={`form-field${errors.codebar ? ' form-field--error' : ''}`}>
                   <label className="form-label form-label--required" htmlFor="product-codebar">
-                    Barcode
+                    Codigo de barras
                   </label>
                   <input
                     id="product-codebar"
@@ -128,7 +128,7 @@ export const ProductFormModal = ({
 
                 <div className={`form-field${errors.name ? ' form-field--error' : ''}`}>
                   <label className="form-label form-label--required" htmlFor="product-name">
-                    Name
+                    Nombre
                   </label>
                   <input
                     id="product-name"
@@ -143,7 +143,7 @@ export const ProductFormModal = ({
 
                 <div className={`form-field${errors.brand ? ' form-field--error' : ''}`}>
                   <label className="form-label form-label--required" htmlFor="product-brand">
-                    Brand
+                    Marca
                   </label>
                   <input
                     id="product-brand"
@@ -161,7 +161,7 @@ export const ProductFormModal = ({
                     className="form-label form-label--required"
                     htmlFor="product-category"
                   >
-                    Category
+                    Categoria
                   </label>
                   <input
                     id="product-category"
@@ -179,14 +179,14 @@ export const ProductFormModal = ({
             </fieldset>
 
             <fieldset className="form-section">
-              <legend className="form-section-title">Pricing and Stock</legend>
+              <legend className="form-section-title">Precios y stock</legend>
               <div className="form-grid form-grid--3col">
                 <div className={`form-field${errors.salePrice ? ' form-field--error' : ''}`}>
                   <label
                     className="form-label form-label--required"
                     htmlFor="product-sale-price"
                   >
-                    Sale Price
+                    Precio venta
                   </label>
                   <input
                     id="product-sale-price"
@@ -213,7 +213,7 @@ export const ProductFormModal = ({
                     className="form-label form-label--required"
                     htmlFor="product-purchase-price"
                   >
-                    Purchase Price
+                    Precio compra
                   </label>
                   <input
                     id="product-purchase-price"
@@ -257,7 +257,7 @@ export const ProductFormModal = ({
             </fieldset>
 
             <fieldset className="form-section">
-              <legend className="form-section-title">Status</legend>
+              <legend className="form-section-title">Estado</legend>
               <div className="form-field form-field--inline">
                 <label className="toggle-switch">
                   <input
@@ -270,7 +270,7 @@ export const ProductFormModal = ({
                   <span className="toggle-slider"></span>
                 </label>
                 <span className="toggle-label">
-                  {values.isActive ? 'Active product' : 'Inactive product'}
+                  {values.isActive ? 'Producto activo' : 'Producto inactivo'}
                 </span>
               </div>
             </fieldset>
@@ -278,14 +278,14 @@ export const ProductFormModal = ({
 
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>
-              Cancel
+              Cancelar
             </button>
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
               {isSubmitting
-                ? 'Saving...'
+                ? 'Guardando...'
                 : mode === 'create'
-                  ? 'Create Product'
-                  : 'Save Changes'}
+                  ? 'Agregar producto'
+                  : 'Guardar cambios'}
             </button>
           </div>
         </form>

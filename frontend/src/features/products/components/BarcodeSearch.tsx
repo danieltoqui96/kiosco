@@ -10,7 +10,7 @@ interface BarcodeSearchProps {
 
 export const BarcodeSearch = ({
   value,
-  placeholder = 'Scan barcode or search product...',
+  placeholder = 'Escanear codigo de barras o buscar producto...',
   isLoading = false,
   onChange,
   onSearch,
@@ -50,12 +50,12 @@ export const BarcodeSearch = ({
         />
 
         <button type="submit" className="scanner-btn" disabled={isLoading}>
-          {isLoading ? 'Searching...' : 'Search'}
+          {isLoading ? 'Buscando...' : 'Buscar'}
         </button>
       </form>
 
       <div className="scanner-hint">
-        Press Enter to search or scan the product barcode.
+        Presiona Enter para buscar o escanea el codigo de barras del producto.
       </div>
     </section>
   );

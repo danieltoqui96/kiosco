@@ -38,6 +38,9 @@ export const ProductPage = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [modalState, setModalState] = useState<ProductModalState>(defaultModalState);
+  const [formInitialValues, setFormInitialValues] = useState<ProductFormValues | null>(
+    null,
+  );
   const hasActiveFilters =
     searchFilter.trim().length > 0 ||
     brandFilter.trim().length > 0 ||
@@ -87,7 +90,7 @@ export const ProductPage = () => {
       setTotalPages(response.totalPages);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to load products.';
+        error instanceof Error ? error.message : 'No se pudieron cargar los productos.';
       setErrorMessage(message);
       setProducts([]);
       setTotalItems(0);
@@ -124,25 +127,6 @@ export const ProductPage = () => {
     [products, selectedProductId],
   );
 
-  const editingProduct = useMemo(
-    () =>
-      products.find((product) => product.id === modalState.editingProductId) ?? null,
-    [modalState.editingProductId, products],
-  );
-
-  const modalInitialValues: ProductFormValues | null = editingProduct
-    ? {
-        codebar: editingProduct.codebar,
-        name: editingProduct.name,
-        brand: editingProduct.brand,
-        category: editingProduct.category,
-        salePrice: editingProduct.salePrice,
-        purchasePrice: editingProduct.purchasePrice,
-        stock: editingProduct.stock,
-        isActive: editingProduct.isActive,
-      }
-    : null;
-
   const handleBarcodeSearch = async (value: string) => {
     const normalizedValue = value.trim();
     setBarcodeQuery(normalizedValue);
@@ -167,16 +151,16 @@ export const ProductPage = () => {
       setSelectedProductId(product.id);
       setIsDetailOpen(true);
       setSearchFilter(normalizedValue);
-      setSuccessMessage('Product found by barcode.');
+      setSuccessMessage('Producto encontrado por codigo de barras.');
     } catch (error) {
       if (error instanceof ApiClientError && error.statusCode === 404) {
         setSelectedProductId(null);
         setSearchFilter(normalizedValue);
         setPage(1);
-        setErrorMessage('Barcode not found. Showing search results.');
+        setErrorMessage('No existe ese codigo de barras. Mostrando resultados de busqueda.');
       } else {
         const message =
-          error instanceof Error ? error.message : 'Barcode search failed.';
+          error instanceof Error ? error.message : 'Fallo la busqueda por codigo.';
         setErrorMessage(message);
       }
     } finally {
@@ -192,7 +176,7 @@ export const ProductPage = () => {
     setStatusFilter('');
     setPage(1);
     setErrorMessage(null);
-    setSuccessMessage('Filters cleared.');
+    setSuccessMessage('Filtros limpiados.');
   };
 
   const handleSelectProduct = (productId: number) => {
@@ -203,6 +187,7 @@ export const ProductPage = () => {
   const handleOpenCreate = () => {
     setErrorMessage(null);
     setSuccessMessage(null);
+    setFormInitialValues(null);
     setModalState({
       isOpen: true,
       mode: 'create',
@@ -211,6 +196,23 @@ export const ProductPage = () => {
   };
 
   const handleOpenEdit = (productId: number) => {
+    const product = products.find((item) => item.id === productId);
+    if (!product) {
+      setErrorMessage('No se encontro el producto para editar.');
+      return;
+    }
+
+    setFormInitialValues({
+      codebar: product.codebar,
+      name: product.name,
+      brand: product.brand,
+      category: product.category,
+      salePrice: product.salePrice,
+      purchasePrice: product.purchasePrice,
+      stock: product.stock,
+      isActive: product.isActive,
+    });
+
     setErrorMessage(null);
     setSuccessMessage(null);
     setModalState({
@@ -225,7 +227,7 @@ export const ProductPage = () => {
     if (!product) return;
 
     const shouldDelete = window.confirm(
-      `Do you want to delete "${product.name}"?`,
+      `Deseas eliminar "${product.name}"?`,
     );
     if (!shouldDelete) return;
 
@@ -241,10 +243,10 @@ export const ProductPage = () => {
       }
 
       await fetchProducts();
-      setSuccessMessage(`Product "${product.name}" was deleted.`);
+      setSuccessMessage(`Producto "${product.name}" eliminado.`);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to delete product.';
+        error instanceof Error ? error.message : 'No se pudo eliminar el producto.';
       setErrorMessage(message);
     } finally {
       setIsLoading(false);
@@ -262,6 +264,7 @@ export const ProductPage = () => {
 
         setSelectedProductId(createdProduct.id);
         setIsDetailOpen(true);
+        setFormInitialValues(null);
         setModalState(defaultModalState);
         setBarcodeQuery('');
         setSearchFilter('');
@@ -276,29 +279,30 @@ export const ProductPage = () => {
         }
 
         void fetchCatalogs();
-        setSuccessMessage(`Product "${createdProduct.name}" was created.`);
+        setSuccessMessage(`Producto "${createdProduct.name}" creado.`);
         return;
       }
 
       if (!modalState.editingProductId) {
-        setErrorMessage('No product selected for editing.');
+        setErrorMessage('No hay producto seleccionado para editar.');
         return;
       }
 
       const updatedProduct = await productsApi.update(modalState.editingProductId, values);
       setSelectedProductId(updatedProduct.id);
       setIsDetailOpen(true);
+      setFormInitialValues(null);
       setModalState(defaultModalState);
       await fetchProducts();
       void fetchCatalogs();
-      setSuccessMessage(`Product "${updatedProduct.name}" was updated.`);
+      setSuccessMessage(`Producto "${updatedProduct.name}" actualizado.`);
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : modalState.mode === 'create'
-            ? 'Failed to create product.'
-            : 'Failed to update product.';
+            ? 'No se pudo crear el producto.'
+            : 'No se pudo actualizar el producto.';
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
@@ -310,8 +314,8 @@ export const ProductPage = () => {
       <main className="main-content">
         <header className="page-header">
           <div className="header-left">
-            <h1 className="page-title">Product Management</h1>
-            <span className="breadcrumb">Home / Products</span>
+            <h1 className="page-title">Gestion de productos</h1>
+            <span className="breadcrumb">Inicio / Productos</span>
           </div>
           <div className="header-actions">
             <button
@@ -320,7 +324,7 @@ export const ProductPage = () => {
               onClick={handleOpenCreate}
             >
               <span className="btn-icon">+</span>
-              New Product
+              Agregar producto
             </button>
           </div>
         </header>
@@ -341,7 +345,7 @@ export const ProductPage = () => {
           <div className="filters-group">
             <div className="filter-item">
               <label className="filter-label" htmlFor="brand-filter">
-                Brand
+                Marca
               </label>
               <select
                 id="brand-filter"
@@ -352,7 +356,7 @@ export const ProductPage = () => {
                   setPage(1);
                 }}
               >
-                <option value="">All</option>
+                <option value="">Todas</option>
                 {(brandOptions.length > 0 ? brandOptions : fallbackBrandOptions).map((brand) => (
                   <option key={brand} value={brand}>
                     {brand}
@@ -363,7 +367,7 @@ export const ProductPage = () => {
 
             <div className="filter-item">
               <label className="filter-label" htmlFor="category-filter">
-                Category
+                Categoria
               </label>
               <select
                 id="category-filter"
@@ -374,7 +378,7 @@ export const ProductPage = () => {
                   setPage(1);
                 }}
               >
-                <option value="">All</option>
+                <option value="">Todas</option>
                 {(categoryOptions.length > 0
                   ? categoryOptions
                   : fallbackCategoryOptions
@@ -388,7 +392,7 @@ export const ProductPage = () => {
 
             <div className="filter-item">
               <label className="filter-label" htmlFor="status-filter">
-                Status
+                Estado
               </label>
               <select
                 id="status-filter"
@@ -399,9 +403,9 @@ export const ProductPage = () => {
                   setPage(1);
                 }}
               >
-                <option value="">All</option>
-                <option value="true">Active</option>
-                <option value="false">Inactive</option>
+                <option value="">Todos</option>
+                <option value="true">Activo</option>
+                <option value="false">Inactivo</option>
               </select>
             </div>
           </div>
@@ -412,10 +416,10 @@ export const ProductPage = () => {
               className="btn btn-ghost"
               onClick={handleClearFilters}
             >
-              Clear filters
+              Limpiar filtros
             </button>
             <span className="results-count">
-              Showing {products.length} of {totalItems} products
+              Mostrando {products.length} de {totalItems} productos
             </span>
           </div>
         </section>
@@ -424,14 +428,6 @@ export const ProductPage = () => {
           products={products}
           selectedProductId={selectedProductId}
           onSelectProduct={handleSelectProduct}
-          onViewProduct={(productId) => {
-            setSelectedProductId(productId);
-            setIsDetailOpen(true);
-          }}
-          onEditProduct={handleOpenEdit}
-          onDeleteProduct={(productId) => {
-            void handleDelete(productId);
-          }}
           currentPage={page}
           totalPages={totalPages}
           totalItems={totalItems}
@@ -439,8 +435,8 @@ export const ProductPage = () => {
           isLoading={isLoading}
           emptyMessage={
             hasActiveFilters
-              ? 'No products match the current filters.'
-              : 'No products available yet.'
+              ? 'No hay productos que coincidan con los filtros.'
+              : 'Aun no hay productos disponibles.'
           }
           onPrevPage={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
           onNextPage={() =>
@@ -470,9 +466,12 @@ export const ProductPage = () => {
         key={`${modalState.mode}-${modalState.editingProductId ?? 'new'}-${String(modalState.isOpen)}`}
         isOpen={modalState.isOpen}
         mode={modalState.mode}
-        initialValues={modalInitialValues}
+        initialValues={formInitialValues}
         isSubmitting={isSubmitting}
-        onClose={() => setModalState(defaultModalState)}
+        onClose={() => {
+          setFormInitialValues(null);
+          setModalState(defaultModalState);
+        }}
         onSubmit={(values) => {
           void handleSubmitProduct(values);
         }}
