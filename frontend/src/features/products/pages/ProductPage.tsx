@@ -215,37 +215,50 @@ export const ProductPage = () => {
   };
 
   const handleSubmitProduct = async (values: ProductFormValues) => {
-    if (modalState.mode !== 'create') {
-      window.alert('Edit flow will be connected in Stage 3.');
-      setModalState(defaultModalState);
-      return;
-    }
-
     setIsSubmitting(true);
     setErrorMessage(null);
 
     try {
-      const createdProduct = await productsApi.create(values);
+      if (modalState.mode === 'create') {
+        const createdProduct = await productsApi.create(values);
 
-      setSelectedProductId(createdProduct.id);
-      setIsDetailOpen(true);
-      setModalState(defaultModalState);
-      setBarcodeQuery('');
-      setSearchFilter('');
-      setBrandFilter('');
-      setCategoryFilter('');
-      setStatusFilter('');
+        setSelectedProductId(createdProduct.id);
+        setIsDetailOpen(true);
+        setModalState(defaultModalState);
+        setBarcodeQuery('');
+        setSearchFilter('');
+        setBrandFilter('');
+        setCategoryFilter('');
+        setStatusFilter('');
 
-      if (page !== 1) {
-        setPage(1);
-      } else {
-        await fetchProducts();
+        if (page !== 1) {
+          setPage(1);
+        } else {
+          await fetchProducts();
+        }
+
+        void fetchCatalogs();
+        return;
       }
 
+      if (!modalState.editingProductId) {
+        setErrorMessage('No product selected for editing.');
+        return;
+      }
+
+      const updatedProduct = await productsApi.update(modalState.editingProductId, values);
+      setSelectedProductId(updatedProduct.id);
+      setIsDetailOpen(true);
+      setModalState(defaultModalState);
+      await fetchProducts();
       void fetchCatalogs();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to create product.';
+        error instanceof Error
+          ? error.message
+          : modalState.mode === 'create'
+            ? 'Failed to create product.'
+            : 'Failed to update product.';
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
