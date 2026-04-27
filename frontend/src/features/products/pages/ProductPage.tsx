@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import '../styles/products.css';
 import { BarcodeSearch } from '../components/BarcodeSearch';
 import { ProductDetails } from '../components/ProductDetails';
 import { ProductFormModal } from '../components/ProductFormModal';
@@ -49,8 +50,7 @@ export const ProductPage = () => {
       const matchesCategory =
         categoryFilter.length === 0 || product.category === categoryFilter;
       const matchesStatus =
-        statusFilter.length === 0 ||
-        String(product.isActive) === statusFilter;
+        statusFilter.length === 0 || String(product.isActive) === statusFilter;
 
       return matchesSearch && matchesBrand && matchesCategory && matchesStatus;
     });
