@@ -25,29 +25,34 @@ export function getStockStatus(
 
 export function getStatusLabel(
   isActive: boolean,
-  stockStatus: ProductUiDerived['stockStatus'],
 ): ProductUiDerived['statusLabel'] {
-  if (stockStatus === 'zero') return 'Sin stock';
-  if (!isActive) return 'Inactivo';
-  if (stockStatus === 'low') return 'Stock bajo';
-  return 'Activo';
+  return isActive ? 'Activo' : 'Inactivo';
 }
 
 export function getStatusBadgeClass(
   statusLabel: ProductUiDerived['statusLabel'],
 ): string {
   if (statusLabel === 'Activo') return 'status-badge status-badge--active';
-  if (statusLabel === 'Stock bajo') return 'status-badge status-badge--warning';
   return 'status-badge status-badge--inactive';
+}
+
+export function getStockAlertLabel(
+  stockStatus: ProductUiDerived['stockStatus'],
+): ProductUiDerived['stockAlertLabel'] {
+  if (stockStatus === 'zero') return 'Sin stock';
+  if (stockStatus === 'low') return 'Stock bajo';
+  return null;
 }
 
 export function toProductViewModel(product: Product): ProductViewModel {
   const stockStatus = getStockStatus(product.stock);
-  const statusLabel = getStatusLabel(product.isActive, stockStatus);
+  const statusLabel = getStatusLabel(product.isActive);
+  const stockAlertLabel = getStockAlertLabel(stockStatus);
 
   return {
     ...product,
     stockStatus,
     statusLabel,
+    stockAlertLabel,
   };
 }

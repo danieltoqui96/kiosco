@@ -77,7 +77,8 @@ export interface ProductFiltersState {
 
 export interface ProductUiDerived {
   stockStatus: 'ok' | 'low' | 'zero';
-  statusLabel: 'Activo' | 'Inactivo' | 'Stock bajo' | 'Sin stock';
+  statusLabel: 'Activo' | 'Inactivo';
+  stockAlertLabel: 'Stock bajo' | 'Sin stock' | null;
 }
 
 export interface ProductSelectionState {

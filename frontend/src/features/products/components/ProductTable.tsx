@@ -51,17 +51,17 @@ export const ProductTable = ({
       <table className="data-table">
         <thead className="table-header">
           <tr>
-            <th className="table-cell table-cell--header">ID</th>
-            <th className="table-cell table-cell--header">Codigo</th>
             <th className="table-cell table-cell--header">Producto</th>
             <th className="table-cell table-cell--header">Marca</th>
             <th className="table-cell table-cell--header">Categoria</th>
+            <th className="table-cell table-cell--header">Codigo</th>
             <th className="table-cell table-cell--header table-cell--right">
               Precio
             </th>
             <th className="table-cell table-cell--header table-cell--right">
-              Stock
+              Unidades
             </th>
+            <th className="table-cell table-cell--header">Stock</th>
             <th className="table-cell table-cell--header">Estado</th>
           </tr>
         </thead>
@@ -95,9 +95,6 @@ export const ProductTable = ({
                   }}
                   tabIndex={0}
                 >
-                  <td className="table-cell table-cell--number">{product.id}</td>
-                  <td className="table-cell table-cell--code">{product.codebar}</td>
-
                   <td className="table-cell">
                     <div className="product-cell">
                       <div className="product-info">
@@ -112,12 +109,20 @@ export const ProductTable = ({
                     <span className="category-badge">{product.category}</span>
                   </td>
 
+                  <td className="table-cell table-cell--code">{product.codebar}</td>
+
                   <td className="table-cell table-cell--right table-cell--number">
                     {formatCurrency(product.salePrice)}
                   </td>
 
                   <td className="table-cell table-cell--right table-cell--number">
                     {product.stock}
+                  </td>
+
+                  <td className="table-cell">
+                    <span className={`stock-indicator stock-indicator--${product.stockStatus}`}>
+                      {product.stockAlertLabel ?? 'Normal'}
+                    </span>
                   </td>
 
                   <td className="table-cell">

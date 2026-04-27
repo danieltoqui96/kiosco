@@ -119,6 +119,16 @@ export const ProductDetails = ({
                   <dt className="info-label">Stock actual</dt>
                   <dd className="info-value">{product.stock} unidades</dd>
                 </div>
+                {product.stockAlertLabel ? (
+                  <div className="info-row">
+                    <dt className="info-label">Alerta inventario</dt>
+                    <dd className="info-value">
+                      <span className={`stock-indicator stock-indicator--${product.stockStatus}`}>
+                        {product.stockAlertLabel}
+                      </span>
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
             </div>
           </>
