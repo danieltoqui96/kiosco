@@ -19,6 +19,26 @@ export const brandsApi = {
   getById(id: number) {
     return requestJson<Brand>(`/brands/${id}`);
   },
+
+  create(payload: { name: string }) {
+    return requestJson<Brand>('/brands', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  update(id: number, payload: { name: string }) {
+    return requestJson<Brand>(`/brands/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  remove(id: number) {
+    return requestJson<Brand>(`/brands/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 export const categoriesApi = {
@@ -30,5 +50,25 @@ export const categoriesApi = {
 
   getById(id: number) {
     return requestJson<Category>(`/categories/${id}`);
+  },
+
+  create(payload: { name: string }) {
+    return requestJson<Category>('/categories', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  update(id: number, payload: { name: string }) {
+    return requestJson<Category>(`/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  remove(id: number) {
+    return requestJson<Category>(`/categories/${id}`, {
+      method: 'DELETE',
+    });
   },
 };

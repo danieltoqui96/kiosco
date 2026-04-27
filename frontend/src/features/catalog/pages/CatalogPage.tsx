@@ -63,12 +63,23 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
   const [totalPages, setTotalPages] = useState(0);
   const [isListLoading, setIsListLoading] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(true);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [formName, setFormName] = useState('');
+  const selectedItemId = selectedItem?.id ?? null;
 
   const singularLabel = mode === 'brands' ? 'Marca' : 'Categoria';
   const pluralLabel = mode === 'brands' ? 'Marcas' : 'Categorias';
+  const singularLabelLower = singularLabel.toLowerCase();
+  const canDeleteSelected =
+    selectedItem !== null && selectedItem.productsCount === 0 && !isDeleting;
 
   const getProductsFilter = useCallback(
     (name: string): ProductQueryParams =>
@@ -130,9 +141,24 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
       setTotalItems(response.total);
       setTotalPages(response.totalPages);
 
-      if (selectedItem && !withCounts.some((item) => item.id === selectedItem.id)) {
+      if (selectedItemId && !withCounts.some((item) => item.id === selectedItemId)) {
         setSelectedItem(null);
         setDetailProducts([]);
+      }
+      if (selectedItemId) {
+        const refreshedSelected = withCounts.find((item) => item.id === selectedItemId);
+        if (refreshedSelected) {
+          setSelectedItem((current) => {
+            if (!current || current.id !== refreshedSelected.id) return current;
+            if (
+              current.name === refreshedSelected.name &&
+              current.productsCount === refreshedSelected.productsCount
+            ) {
+              return current;
+            }
+            return refreshedSelected;
+          });
+        }
       }
     } catch (error) {
       const message =
@@ -146,7 +172,136 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
     } finally {
       setIsListLoading(false);
     }
-  }, [fetchProductsCountByName, mode, page, pluralLabel, searchQuery, selectedItem]);
+  }, [fetchProductsCountByName, mode, page, pluralLabel, searchQuery, selectedItemId]);
+
+  const openCreateModal = () => {
+    setActionError(null);
+    setActionSuccess(null);
+    setFormMode('create');
+    setFormName('');
+    setIsFormOpen(true);
+  };
+
+  const openEditModal = () => {
+    if (!selectedItem) {
+      setActionError(`Selecciona una ${singularLabelLower} para editar.`);
+      return;
+    }
+    setActionError(null);
+    setActionSuccess(null);
+    setFormMode('edit');
+    setFormName(selectedItem.name);
+    setIsFormOpen(true);
+  };
+
+  const closeFormModal = () => {
+    setIsFormOpen(false);
+    setFormName('');
+  };
+
+  const handleSubmitForm = async () => {
+    const normalizedName = formName.trim();
+    if (normalizedName.length === 0) {
+      setActionError(`El nombre de ${singularLabelLower} es obligatorio.`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setActionError(null);
+    setActionSuccess(null);
+
+    try {
+      if (formMode === 'create') {
+        if (mode === 'brands') {
+          await brandsApi.create({ name: normalizedName });
+        } else {
+          await categoriesApi.create({ name: normalizedName });
+        }
+
+        closeFormModal();
+        setSearchInput('');
+        setSearchQuery('');
+        if (page !== 1) {
+          setPage(1);
+        } else {
+          await fetchCatalogItems();
+        }
+        setActionSuccess(`${singularLabel} creada correctamente.`);
+        return;
+      }
+
+      if (!selectedItem) {
+        setActionError(`Selecciona una ${singularLabelLower} para editar.`);
+        return;
+      }
+
+      if (mode === 'brands') {
+        await brandsApi.update(selectedItem.id, { name: normalizedName });
+      } else {
+        await categoriesApi.update(selectedItem.id, { name: normalizedName });
+      }
+
+      const refreshedItem: CatalogItem = { ...selectedItem, name: normalizedName };
+      setSelectedItem(refreshedItem);
+      closeFormModal();
+      await fetchCatalogItems();
+      await fetchDetailProducts(refreshedItem);
+      setActionSuccess(`${singularLabel} actualizada correctamente.`);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : `No se pudo guardar ${singularLabelLower}.`;
+      setActionError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!selectedItem) {
+      setActionError(`Selecciona una ${singularLabelLower} para eliminar.`);
+      return;
+    }
+
+    if (selectedItem.productsCount > 0) {
+      setActionError(
+        `No se puede eliminar: ${singularLabelLower} tiene productos asociados.`,
+      );
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Deseas eliminar ${singularLabelLower} "${selectedItem.name}"?`,
+    );
+    if (!shouldDelete) return;
+
+    setIsDeleting(true);
+    setActionError(null);
+    setActionSuccess(null);
+
+    try {
+      if (mode === 'brands') {
+        await brandsApi.remove(selectedItem.id);
+      } else {
+        await categoriesApi.remove(selectedItem.id);
+      }
+
+      const deletedName = selectedItem.name;
+      setSelectedItem(null);
+      setDetailProducts([]);
+      await fetchCatalogItems();
+      setActionSuccess(`${singularLabel} "${deletedName}" eliminada correctamente.`);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : `No se pudo eliminar ${singularLabelLower}.`;
+      setActionError(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const fetchDetailProducts = useCallback(
     async (item: CatalogItem) => {
@@ -192,6 +347,10 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
     setSearchQuery('');
     setSelectedItem(null);
     setDetailProducts([]);
+    setActionError(null);
+    setActionSuccess(null);
+    setIsFormOpen(false);
+    setFormName('');
   }, [mode]);
 
   useEffect(() => {
@@ -209,6 +368,12 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
           <div className="header-left">
             <h1 className="page-title">Gestion de {pluralLabel.toLowerCase()}</h1>
             <span className="breadcrumb">Inicio / {pluralLabel}</span>
+          </div>
+          <div className="header-actions">
+            <button type="button" className="btn btn-primary" onClick={openCreateModal}>
+              <span className="btn-icon">+</span>
+              Agregar {singularLabel.toLowerCase()}
+            </button>
           </div>
         </header>
 
@@ -263,6 +428,8 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
         </section>
 
         {listError ? <p className="form-error">{listError}</p> : null}
+        {actionError ? <p className="form-error">{actionError}</p> : null}
+        {actionSuccess ? <p className="form-success">{actionSuccess}</p> : null}
 
         <section className="data-table-container">
           <table className="data-table">
@@ -453,7 +620,91 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
             </>
           )}
         </div>
+
+        <div className="panel-footer">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={openEditModal}
+            disabled={!selectedItem || isSubmitting}
+          >
+            Editar {singularLabel.toLowerCase()}
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger-outline"
+            onClick={() => {
+              void handleDeleteSelected();
+            }}
+            disabled={!canDeleteSelected}
+            title={
+              selectedItem && selectedItem.productsCount > 0
+                ? `Solo se puede eliminar cuando la cantidad de productos es 0.`
+                : 'Eliminar'
+            }
+          >
+            {isDeleting ? 'Eliminando...' : `Eliminar ${singularLabel.toLowerCase()}`}
+          </button>
+        </div>
       </aside>
+
+      {isFormOpen ? (
+        <div className="modal-overlay modal-overlay--visible" role="dialog" aria-modal="true">
+          <div className="modal modal--small">
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {formMode === 'create'
+                  ? `Agregar ${singularLabel.toLowerCase()}`
+                  : `Editar ${singularLabel.toLowerCase()}`}
+              </h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={closeFormModal}
+                aria-label="Cerrar"
+              >
+                x
+              </button>
+            </div>
+
+            <div className="modal-content">
+              <div className="form-field">
+                <label className="form-label form-label--required" htmlFor="catalog-name">
+                  Nombre
+                </label>
+                <input
+                  id="catalog-name"
+                  className="form-input"
+                  value={formName}
+                  onChange={(event) => setFormName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      void handleSubmitForm();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-ghost" onClick={closeFormModal}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  void handleSubmitForm();
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 };
