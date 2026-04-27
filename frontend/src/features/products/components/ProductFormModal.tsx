@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import type { ProductFormValues } from '../types';
 
 interface ProductFormModalProps {
@@ -44,6 +44,12 @@ function sanitizeValues(
   };
 }
 
+function getInitialFormValues(
+  values: ProductFormValues | null | undefined,
+): ProductFormValues {
+  return sanitizeValues(values) ?? DEFAULT_VALUES;
+}
+
 function validate(values: ProductFormValues): ProductFormErrors {
   const errors: ProductFormErrors = {};
   if (!values.codebar.trim()) errors.codebar = 'Barcode is required.';
@@ -70,14 +76,10 @@ export const ProductFormModal = ({
   onClose,
   onSubmit,
 }: ProductFormModalProps) => {
-  const [values, setValues] = useState<ProductFormValues>(DEFAULT_VALUES);
+  const [values, setValues] = useState<ProductFormValues>(() =>
+    getInitialFormValues(initialValues),
+  );
   const [errors, setErrors] = useState<ProductFormErrors>({});
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setValues(sanitizeValues(initialValues));
-    setErrors({});
-  }, [initialValues, isOpen]);
 
   const title = useMemo(
     () => (mode === 'create' ? 'Create Product' : 'Edit Product'),

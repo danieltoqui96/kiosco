@@ -120,5 +120,16 @@ Regla de limpieza:
 **Fecha:** 2026-04-27  
 **Resumen:** Se creo este archivo para centralizar el plan de trabajo frontend, mantener trazabilidad de avances y aplicar la regla de aprobacion previa por cada cambio.
 
+### Cambio 1 - Etapa 1 completada (feature products funcional con mock)
+**Fecha:** 2026-04-27  
+**Resumen:** Se implemento la base completa del feature de productos:
+- Tipos alineados a backend y estados de UI.
+- Utilidades de presentacion (precio, estado de stock, badges).
+- Componentes funcionales: `ProductTable`, `BarcodeSearch`, `ProductDetails`, `ProductFormModal`.
+- Orquestacion local en `ProductPage` con filtros, seleccion, paginacion y CRUD mock.
+- Integracion en layout (`MainLayout`) reemplazando la maqueta hardcodeada.
+- Activacion de `products.css` como entrypoint de estilos del feature.
+**Validacion:** `npm.cmd run lint` OK y `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Pendiente: `Cambio 1` (estructura funcional del feature `products`).
+- Pendiente: `Cambio 2` (integracion de lectura con backend real).

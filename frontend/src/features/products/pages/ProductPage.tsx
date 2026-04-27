@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import '../styles/products.css';
 import { BarcodeSearch } from '../components/BarcodeSearch';
 import { ProductDetails } from '../components/ProductDetails';
@@ -58,21 +58,13 @@ export const ProductPage = () => {
 
   const totalItems = filteredProducts.length;
   const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / DEFAULT_PAGE_SIZE);
-
-  useEffect(() => {
-    if (totalPages === 0) {
-      if (page !== 1) setPage(1);
-      return;
-    }
-
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  const effectivePage = totalPages === 0 ? 1 : Math.min(page, totalPages);
 
   const paginatedProducts = useMemo(() => {
-    const start = (page - 1) * DEFAULT_PAGE_SIZE;
+    const start = (effectivePage - 1) * DEFAULT_PAGE_SIZE;
     const end = start + DEFAULT_PAGE_SIZE;
     return filteredProducts.slice(start, end);
-  }, [filteredProducts, page]);
+  }, [effectivePage, filteredProducts]);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -300,7 +292,7 @@ export const ProductPage = () => {
           }}
           onEditProduct={handleOpenEdit}
           onDeleteProduct={handleDelete}
-          currentPage={page}
+          currentPage={effectivePage}
           totalPages={totalPages}
           totalItems={totalItems}
           pageSize={DEFAULT_PAGE_SIZE}
@@ -327,6 +319,7 @@ export const ProductPage = () => {
       />
 
       <ProductFormModal
+        key={`${modalState.mode}-${modalState.editingProductId ?? 'new'}-${String(modalState.isOpen)}`}
         isOpen={modalState.isOpen}
         mode={modalState.mode}
         initialValues={modalInitialValues}
