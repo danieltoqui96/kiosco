@@ -185,128 +185,138 @@ export const ProductPage = () => {
   };
 
   return (
-    <main className="main-content">
-      <header className="page-header">
-        <div className="header-left">
-          <h1 className="page-title">Product Management</h1>
-          <span className="breadcrumb">Home / Products</span>
-        </div>
-        <div className="header-actions">
-          <button type="button" className="btn btn-primary" onClick={handleOpenCreate}>
-            <span className="btn-icon">+</span>
-            New Product
-          </button>
-        </div>
-      </header>
-
-      <BarcodeSearch
-        value={barcodeQuery}
-        onChange={setBarcodeQuery}
-        onSearch={handleSearch}
-      />
-
-      <section className="filters-bar">
-        <div className="filters-group">
-          <div className="filter-item">
-            <label className="filter-label" htmlFor="brand-filter">
-              Brand
-            </label>
-            <select
-              id="brand-filter"
-              className="filter-select"
-              value={brandFilter}
-              onChange={(event) => {
-                setBrandFilter(event.target.value);
-                setPage(1);
-              }}
+    <>
+      <main className="main-content">
+        <header className="page-header">
+          <div className="header-left">
+            <h1 className="page-title">Product Management</h1>
+            <span className="breadcrumb">Home / Products</span>
+          </div>
+          <div className="header-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleOpenCreate}
             >
-              <option value="">All</option>
-              {brandOptions.map((brand) => (
-                <option key={brand} value={brand}>
-                  {brand}
-                </option>
-              ))}
-            </select>
+              <span className="btn-icon">+</span>
+              New Product
+            </button>
+          </div>
+        </header>
+
+        <BarcodeSearch
+          value={barcodeQuery}
+          onChange={setBarcodeQuery}
+          onSearch={handleSearch}
+        />
+
+        <section className="filters-bar">
+          <div className="filters-group">
+            <div className="filter-item">
+              <label className="filter-label" htmlFor="brand-filter">
+                Brand
+              </label>
+              <select
+                id="brand-filter"
+                className="filter-select"
+                value={brandFilter}
+                onChange={(event) => {
+                  setBrandFilter(event.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All</option>
+                {brandOptions.map((brand) => (
+                  <option key={brand} value={brand}>
+                    {brand}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-item">
+              <label className="filter-label" htmlFor="category-filter">
+                Category
+              </label>
+              <select
+                id="category-filter"
+                className="filter-select"
+                value={categoryFilter}
+                onChange={(event) => {
+                  setCategoryFilter(event.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All</option>
+                {categoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-item">
+              <label className="filter-label" htmlFor="status-filter">
+                Status
+              </label>
+              <select
+                id="status-filter"
+                className="filter-select"
+                value={statusFilter}
+                onChange={(event) => {
+                  setStatusFilter(event.target.value as '' | 'true' | 'false');
+                  setPage(1);
+                }}
+              >
+                <option value="">All</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
           </div>
 
-          <div className="filter-item">
-            <label className="filter-label" htmlFor="category-filter">
-              Category
-            </label>
-            <select
-              id="category-filter"
-              className="filter-select"
-              value={categoryFilter}
-              onChange={(event) => {
-                setCategoryFilter(event.target.value);
-                setPage(1);
-              }}
+          <div className="filters-actions">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={handleClearFilters}
             >
-              <option value="">All</option>
-              {categoryOptions.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
+              Clear filters
+            </button>
+            <span className="results-count">
+              Showing {paginatedProducts.length} of {totalItems} products
+            </span>
           </div>
+        </section>
 
-          <div className="filter-item">
-            <label className="filter-label" htmlFor="status-filter">
-              Status
-            </label>
-            <select
-              id="status-filter"
-              className="filter-select"
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value as '' | 'true' | 'false');
-                setPage(1);
-              }}
-            >
-              <option value="">All</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="filters-actions">
-          <button type="button" className="btn btn-ghost" onClick={handleClearFilters}>
-            Clear filters
-          </button>
-          <span className="results-count">
-            Showing {paginatedProducts.length} of {totalItems} products
-          </span>
-        </div>
-      </section>
-
-      <ProductTable
-        products={paginatedProducts}
-        selectedProductId={selectedProductId}
-        onSelectProduct={handleSelectProduct}
-        onViewProduct={(productId) => {
-          setSelectedProductId(productId);
-          setIsDetailOpen(true);
-        }}
-        onEditProduct={handleOpenEdit}
-        onDeleteProduct={handleDelete}
-        currentPage={page}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        pageSize={DEFAULT_PAGE_SIZE}
-        onPrevPage={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-        onNextPage={() =>
-          setPage((currentPage) =>
-            totalPages === 0 ? 1 : Math.min(totalPages, currentPage + 1),
-          )
-        }
-        onGoToPage={(nextPage) => {
-          if (nextPage < 1) return;
-          if (totalPages !== 0 && nextPage > totalPages) return;
-          setPage(nextPage);
-        }}
-      />
+        <ProductTable
+          products={paginatedProducts}
+          selectedProductId={selectedProductId}
+          onSelectProduct={handleSelectProduct}
+          onViewProduct={(productId) => {
+            setSelectedProductId(productId);
+            setIsDetailOpen(true);
+          }}
+          onEditProduct={handleOpenEdit}
+          onDeleteProduct={handleDelete}
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={DEFAULT_PAGE_SIZE}
+          onPrevPage={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+          onNextPage={() =>
+            setPage((currentPage) =>
+              totalPages === 0 ? 1 : Math.min(totalPages, currentPage + 1),
+            )
+          }
+          onGoToPage={(nextPage) => {
+            if (nextPage < 1) return;
+            if (totalPages !== 0 && nextPage > totalPages) return;
+            setPage(nextPage);
+          }}
+        />
+      </main>
 
       <ProductDetails
         product={selectedProduct}
@@ -323,6 +333,6 @@ export const ProductPage = () => {
         onClose={() => setModalState(defaultModalState)}
         onSubmit={handleSubmitProduct}
       />
-    </main>
+    </>
   );
 };
