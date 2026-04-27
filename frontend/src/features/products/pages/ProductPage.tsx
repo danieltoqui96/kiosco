@@ -10,7 +10,7 @@ import { ProductTable } from '../components/ProductTable';
 import { toProductViewModel } from '../presentation.utils';
 import type { ProductFormValues, ProductModalState, ProductViewModel } from '../types';
 
-const DEFAULT_PAGE_SIZE = 5;
+const DEFAULT_PAGE_SIZE = 10;
 
 const defaultModalState: ProductModalState = {
   isOpen: false,
@@ -180,7 +180,7 @@ export const ProductPage = () => {
   };
 
   const handleSelectProduct = (productId: number) => {
-    setSelectedProductId((currentId) => (currentId === productId ? null : productId));
+    setSelectedProductId(productId);
     setIsDetailOpen(true);
   };
 

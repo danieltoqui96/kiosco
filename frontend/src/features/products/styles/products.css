@@ -23,3 +23,55 @@
   outline: 2px solid var(--color-primary-500);
   outline-offset: -2px;
 }
+
+/* Compact layout for products search + filters to show more rows */
+.main-content {
+  gap: var(--space-md);
+}
+
+.barcode-scanner {
+  padding: var(--space-md);
+}
+
+.scanner-container {
+  gap: var(--space-sm);
+}
+
+.scanner-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.scanner-input {
+  font-size: 1rem;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.scanner-btn {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.875rem;
+}
+
+.scanner-hint {
+  margin-top: 4px;
+}
+
+.filters-bar {
+  padding: var(--space-sm) var(--space-md);
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.filters-group {
+  gap: var(--space-sm);
+}
+
+.filter-item {
+  gap: 2px;
+}
+
+.filter-select {
+  min-width: 130px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}

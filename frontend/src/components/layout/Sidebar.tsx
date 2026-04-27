@@ -9,36 +9,18 @@ export const Sidebar = () => {
 
         <nav className="sidebar-nav">
           <a href="#" className="nav-item active">
-            <span className="nav-icon">📦</span>
+            <span className="nav-icon">P</span>
             <span className="nav-label">Productos</span>
           </a>
           <a href="#" className="nav-item">
-            <span className="nav-icon">📋</span>
-            <span className="nav-label">Categorías</span>
+            <span className="nav-icon">C</span>
+            <span className="nav-label">Categorias</span>
           </a>
           <a href="#" className="nav-item">
-            <span className="nav-icon">🏢</span>
-            <span className="nav-label">Proveedores</span>
-          </a>
-          <a href="#" className="nav-item">
-            <span className="nav-icon">📊</span>
-            <span className="nav-label">Reportes</span>
-          </a>
-          <a href="#" className="nav-item">
-            <span className="nav-icon">⚙️</span>
-            <span className="nav-label">Configuración</span>
+            <span className="nav-icon">M</span>
+            <span className="nav-label">Marcas</span>
           </a>
         </nav>
-
-        <div className="sidebar-footer">
-          <div className="user-info">
-            <div className="user-avatar">JD</div>
-            <div className="user-details">
-              <span className="user-name">Juan Díaz</span>
-              <span className="user-role">Administrador</span>
-            </div>
-          </div>
-        </div>
       </aside>
     </div>
   );

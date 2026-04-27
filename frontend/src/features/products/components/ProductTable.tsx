@@ -16,12 +16,6 @@ interface ProductTableProps {
   emptyMessage?: string;
 }
 
-function getStockClass(stockStatus: ProductViewModel['stockStatus']): string {
-  if (stockStatus === 'ok') return 'stock-indicator stock-indicator--ok';
-  if (stockStatus === 'low') return 'stock-indicator stock-indicator--low';
-  return 'stock-indicator stock-indicator--zero';
-}
-
 function buildVisiblePages(currentPage: number, totalPages: number): number[] {
   if (totalPages <= 5) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -46,7 +40,7 @@ export const ProductTable = ({
   onNextPage,
   onGoToPage,
   isLoading = false,
-  emptyMessage = 'No products found.',
+  emptyMessage = 'No hay productos.',
 }: ProductTableProps) => {
   const visiblePages = buildVisiblePages(currentPage, totalPages);
   const rangeStart = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
@@ -59,6 +53,7 @@ export const ProductTable = ({
           <tr>
             <th className="table-cell table-cell--header">Codigo</th>
             <th className="table-cell table-cell--header">Producto</th>
+            <th className="table-cell table-cell--header">Marca</th>
             <th className="table-cell table-cell--header">Categoria</th>
             <th className="table-cell table-cell--header table-cell--right">
               Precio
@@ -73,13 +68,13 @@ export const ProductTable = ({
         <tbody className="table-body">
           {isLoading ? (
             <tr className="table-row">
-              <td className="table-cell" colSpan={6}>
+              <td className="table-cell" colSpan={7}>
                 Cargando productos...
               </td>
             </tr>
           ) : products.length === 0 ? (
             <tr className="table-row">
-              <td className="table-cell" colSpan={6}>
+              <td className="table-cell" colSpan={7}>
                 {emptyMessage}
               </td>
             </tr>
@@ -103,15 +98,13 @@ export const ProductTable = ({
 
                   <td className="table-cell">
                     <div className="product-cell">
-                      <div className="product-image">
-                        <span className="product-image-placeholder">PR</span>
-                      </div>
                       <div className="product-info">
                         <span className="product-name">{product.name}</span>
-                        <span className="product-sku">{product.brand}</span>
                       </div>
                     </div>
                   </td>
+
+                  <td className="table-cell">{product.brand}</td>
 
                   <td className="table-cell">
                     <span className="category-badge">{product.category}</span>
@@ -121,10 +114,8 @@ export const ProductTable = ({
                     {formatCurrency(product.salePrice)}
                   </td>
 
-                  <td className="table-cell table-cell--right">
-                    <span className={getStockClass(product.stockStatus)}>
-                      {product.stock}
-                    </span>
+                  <td className="table-cell table-cell--right table-cell--number">
+                    {product.stock}
                   </td>
 
                   <td className="table-cell">
