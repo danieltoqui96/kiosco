@@ -33,7 +33,7 @@ interface CatalogPageProps {
 }
 
 const LIST_PAGE_SIZE = 10;
-const DETAIL_PRODUCTS_PAGE_SIZE = 100;
+const DETAIL_PRODUCTS_PAGE_SIZE = 5;
 
 function buildVisiblePages(currentPage: number, totalPages: number): number[] {
   if (totalPages <= 5) {
@@ -59,6 +59,7 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [detailProducts, setDetailProducts] = useState<DetailProduct[]>([]);
+  const [detailProductsTotal, setDetailProductsTotal] = useState(0);
   const [searchInput, setSearchInput] = useState(routeState.q);
   const [searchQuery, setSearchQuery] = useState(routeState.q);
   const [page, setPage] = useState(routeState.page);
@@ -162,6 +163,7 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
         if (!refreshedSelected) {
           setSelectedItem(null);
           setDetailProducts([]);
+          setDetailProductsTotal(0);
         } else if (
           currentSelected.name !== refreshedSelected.name ||
           currentSelected.productsCount !== refreshedSelected.productsCount
@@ -307,6 +309,7 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
       const deletedName = selectedItem.name;
       setSelectedItem(null);
       setDetailProducts([]);
+      setDetailProductsTotal(0);
       await fetchCatalogItems();
       setActionSuccess(`${singularLabel} "${deletedName}" eliminada correctamente.`);
     } catch (error) {
@@ -326,24 +329,14 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
       setDetailError(null);
 
       try {
-        let currentPage = 1;
-        let pages = 1;
-        const products: DetailProduct[] = [];
+        const response = await productsApi.getAll({
+          page: 1,
+          limit: DETAIL_PRODUCTS_PAGE_SIZE,
+          ...getProductsFilter(item.name),
+        });
 
-        do {
-          const response = await productsApi.getAll({
-            page: currentPage,
-            limit: DETAIL_PRODUCTS_PAGE_SIZE,
-            ...getProductsFilter(item.name),
-          });
-
-          products.push(...response.items.map(mapDetailProduct));
-
-          pages = response.totalPages === 0 ? 1 : response.totalPages;
-          currentPage += 1;
-        } while (currentPage <= pages);
-
-        setDetailProducts(products);
+        setDetailProducts(response.items.map(mapDetailProduct));
+        setDetailProductsTotal(response.total);
       } catch (error) {
         const message =
           error instanceof Error
@@ -351,6 +344,7 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
             : `No se pudieron cargar productos de ${singularLabel.toLowerCase()}.`;
         setDetailError(message);
         setDetailProducts([]);
+        setDetailProductsTotal(0);
       } finally {
         setIsDetailLoading(false);
       }
@@ -371,6 +365,7 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
   useEffect(() => {
     setSelectedItem(null);
     setDetailProducts([]);
+    setDetailProductsTotal(0);
     setActionError(null);
     setActionSuccess(null);
     setIsFormOpen(false);
@@ -672,6 +667,11 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
                       )}
                     </tbody>
                   </table>
+                  <div className="table-pagination">
+                    <div className="pagination-info">
+                      Mostrando {detailProducts.length}/{detailProductsTotal} productos
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
