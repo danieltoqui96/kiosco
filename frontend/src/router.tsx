@@ -7,7 +7,7 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/react-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Home } from './pages/Home';
 import type {
   CatalogRouteState,
@@ -19,22 +19,16 @@ type SectionPath = 'productos' | 'categorias' | 'marcas';
 
 interface RouterSearchState {
   page: number;
-  q: string;
-  search: string;
-  brand: string;
-  category: string;
-  status: '' | 'true' | 'false';
-  codebar: string;
+  q?: string;
+  search?: string;
+  brand?: string;
+  category?: string;
+  status?: 'true' | 'false';
+  codebar?: string;
 }
 
-const defaultSearchState: RouterSearchState = {
+const defaultProductsSearch: RouterSearchState = {
   page: 1,
-  q: '',
-  search: '',
-  brand: '',
-  category: '',
-  status: '',
-  codebar: '',
 };
 
 function parsePage(rawValue: unknown): number {
@@ -52,24 +46,29 @@ function parseText(rawValue: unknown): string {
   return typeof rawValue === 'string' ? rawValue : '';
 }
 
-function parseStatus(rawValue: unknown): '' | 'true' | 'false' {
+function parseOptionalText(rawValue: unknown): string | undefined {
+  const value = parseText(rawValue).trim();
+  return value.length > 0 ? value : undefined;
+}
+
+function parseStatus(rawValue: unknown): 'true' | 'false' | undefined {
   if (rawValue === 'true' || rawValue === 'false') return rawValue;
-  return '';
+  return undefined;
 }
 
 function normalizeSearchState(search: Record<string, unknown>): RouterSearchState {
   return {
     page: parsePage(search.page),
-    q: parseText(search.q),
-    search: parseText(search.search),
-    brand: parseText(search.brand),
-    category: parseText(search.category),
+    q: parseOptionalText(search.q),
+    search: parseOptionalText(search.search),
+    brand: parseOptionalText(search.brand),
+    category: parseOptionalText(search.category),
     status: parseStatus(search.status),
-    codebar: parseText(search.codebar),
+    codebar: parseOptionalText(search.codebar),
   };
 }
 
-function toSection(sectionPath: string): CatalogSection {
+function toSection(sectionPath: SectionPath): CatalogSection {
   if (sectionPath === 'categorias') return 'categories';
   if (sectionPath === 'marcas') return 'brands';
   return 'products';
@@ -83,6 +82,36 @@ function toSectionPath(section: CatalogSection): SectionPath {
 
 function isAllowedSection(section: string): section is SectionPath {
   return section === 'productos' || section === 'categorias' || section === 'marcas';
+}
+
+function getSectionPath(section: string): SectionPath {
+  return isAllowedSection(section) ? section : 'productos';
+}
+
+function getDefaultSearchState(section: SectionPath): RouterSearchState {
+  if (section === 'productos') return defaultProductsSearch;
+  return { page: 1 };
+}
+
+function sanitizeSearchForSection(
+  section: SectionPath,
+  search: RouterSearchState,
+): RouterSearchState {
+  if (section === 'productos') {
+    return {
+      page: search.page,
+      search: search.search,
+      brand: search.brand,
+      category: search.category,
+      status: search.status,
+      codebar: search.codebar,
+    };
+  }
+
+  return {
+    page: search.page,
+    q: search.q,
+  };
 }
 
 function isSameSearchState(left: RouterSearchState, right: RouterSearchState): boolean {
@@ -108,7 +137,7 @@ const indexRoute = createRoute({
     throw redirect({
       to: '/$section',
       params: { section: 'productos' },
-      search: defaultSearchState,
+      search: defaultProductsSearch,
     });
   },
 });
@@ -123,7 +152,7 @@ const sectionRoute = createRoute({
       throw redirect({
         to: '/$section',
         params: { section: 'productos' },
-        search: defaultSearchState,
+        search: defaultProductsSearch,
       });
     }
   },
@@ -137,35 +166,50 @@ export const router = createRouter({ routeTree });
 function SectionView() {
   const navigate = useNavigate({ from: sectionRoute.fullPath });
   const { section } = sectionRoute.useParams();
-  const search = sectionRoute.useSearch();
-  const currentSection = toSection(section);
+  const rawSearch = sectionRoute.useSearch();
+  const sectionPath = getSectionPath(section);
+  const currentSection = toSection(sectionPath);
+  const currentSearch = sanitizeSearchForSection(sectionPath, rawSearch);
+
+  useEffect(() => {
+    if (isSameSearchState(rawSearch, currentSearch)) return;
+
+    void navigate({
+      to: '/$section',
+      params: { section: sectionPath },
+      search: currentSearch,
+      replace: true,
+    });
+  }, [currentSearch, navigate, rawSearch, sectionPath]);
 
   const updateSearch = useCallback(
     (patch: Partial<RouterSearchState>) => {
-      const nextSearch: RouterSearchState = {
-        ...search,
+      const mergedSearch: RouterSearchState = {
+        ...currentSearch,
         ...patch,
       };
+      const nextSearch = sanitizeSearchForSection(sectionPath, mergedSearch);
 
-      if (isSameSearchState(search, nextSearch)) return;
+      if (isSameSearchState(currentSearch, nextSearch)) return;
 
       void navigate({
         to: '/$section',
-        params: { section },
+        params: { section: sectionPath },
         search: nextSearch,
         replace: true,
       });
     },
-    [navigate, search, section],
+    [currentSearch, navigate, sectionPath],
   );
 
   const handleSectionNavigate = useCallback(
     (nextSection: CatalogSection) => {
       if (nextSection === currentSection) return;
+      const targetPath = toSectionPath(nextSection);
       void navigate({
         to: '/$section',
-        params: { section: toSectionPath(nextSection) },
-        search: defaultSearchState,
+        params: { section: targetPath },
+        search: getDefaultSearchState(targetPath),
       });
     },
     [currentSection, navigate],
@@ -173,40 +217,65 @@ function SectionView() {
 
   const handleProductRouteStateChange = useCallback(
     (next: Partial<ProductRouteState>) => {
+      if (sectionPath !== 'productos') return;
+
       updateSearch({
-        page: next.page === undefined ? search.page : Math.max(1, Math.floor(next.page)),
-        search: next.search ?? search.search,
-        brand: next.brand ?? search.brand,
-        category: next.category ?? search.category,
-        status: next.status ?? search.status,
-        codebar: next.codebar ?? search.codebar,
+        page:
+          next.page === undefined
+            ? currentSearch.page
+            : Math.max(1, Math.floor(next.page)),
+        search:
+          next.search === undefined
+            ? currentSearch.search
+            : parseOptionalText(next.search),
+        brand:
+          next.brand === undefined
+            ? currentSearch.brand
+            : parseOptionalText(next.brand),
+        category:
+          next.category === undefined
+            ? currentSearch.category
+            : parseOptionalText(next.category),
+        status:
+          next.status === undefined
+            ? currentSearch.status
+            : parseStatus(next.status),
+        codebar:
+          next.codebar === undefined
+            ? currentSearch.codebar
+            : parseOptionalText(next.codebar),
       });
     },
-    [search, updateSearch],
+    [currentSearch, sectionPath, updateSearch],
   );
 
   const handleCatalogRouteStateChange = useCallback(
     (next: Partial<CatalogRouteState>) => {
+      if (sectionPath === 'productos') return;
+
       updateSearch({
-        page: next.page === undefined ? search.page : Math.max(1, Math.floor(next.page)),
-        q: next.q ?? search.q,
+        page:
+          next.page === undefined
+            ? currentSearch.page
+            : Math.max(1, Math.floor(next.page)),
+        q: next.q === undefined ? currentSearch.q : parseOptionalText(next.q),
       });
     },
-    [search, updateSearch],
+    [currentSearch, sectionPath, updateSearch],
   );
 
   const productRouteState: ProductRouteState = {
-    page: search.page,
-    search: search.search,
-    brand: search.brand,
-    category: search.category,
-    status: search.status,
-    codebar: search.codebar,
+    page: currentSearch.page,
+    search: currentSearch.search ?? '',
+    brand: currentSearch.brand ?? '',
+    category: currentSearch.category ?? '',
+    status: currentSearch.status ?? '',
+    codebar: currentSearch.codebar ?? '',
   };
 
   const catalogRouteState: CatalogRouteState = {
-    page: search.page,
-    q: search.q,
+    page: currentSearch.page,
+    q: currentSearch.q ?? '',
   };
 
   return (
