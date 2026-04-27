@@ -24,6 +24,16 @@ export interface Product {
   isActive: boolean;
 }
 
+export interface Brand {
+  id: number;
+  name: string;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+}
+
 export interface ProductFormValues {
   codebar: string;
   name: string;
@@ -46,6 +56,12 @@ export interface ProductQueryParams {
   maxSalePrice?: number;
   minStock?: number;
   maxStock?: number;
+}
+
+export interface CatalogQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
 }
 
 export interface ProductFiltersState {
