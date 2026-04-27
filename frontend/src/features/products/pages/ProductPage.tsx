@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import '../styles/products.css';
 import { brandsApi, categoriesApi } from '../api/catalog.api';
+import { ApiClientError } from '../api/http';
 import { productsApi } from '../api/products.api';
 import { BarcodeSearch } from '../components/BarcodeSearch';
 import { ProductDetails } from '../components/ProductDetails';
@@ -22,6 +23,7 @@ export const ProductPage = () => {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBarcodeSearching, setIsBarcodeSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [barcodeQuery, setBarcodeQuery] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
@@ -134,9 +136,43 @@ export const ProductPage = () => {
       }
     : null;
 
-  const handleSearch = (value: string) => {
-    setSearchFilter(value);
-    setPage(1);
+  const handleBarcodeSearch = async (value: string) => {
+    const normalizedValue = value.trim();
+    setBarcodeQuery(normalizedValue);
+    setErrorMessage(null);
+
+    if (!normalizedValue) {
+      setSearchFilter('');
+      setPage(1);
+      return;
+    }
+
+    setIsBarcodeSearching(true);
+    try {
+      const product = await productsApi.getByCodebar(normalizedValue);
+      const viewModel = toProductViewModel(product);
+
+      setProducts([viewModel]);
+      setTotalItems(1);
+      setTotalPages(1);
+      setPage(1);
+      setSelectedProductId(product.id);
+      setIsDetailOpen(true);
+      setSearchFilter(normalizedValue);
+    } catch (error) {
+      if (error instanceof ApiClientError && error.statusCode === 404) {
+        setSelectedProductId(null);
+        setSearchFilter(normalizedValue);
+        setPage(1);
+        setErrorMessage('Barcode not found. Showing search results.');
+      } else {
+        const message =
+          error instanceof Error ? error.message : 'Barcode search failed.';
+        setErrorMessage(message);
+      }
+    } finally {
+      setIsBarcodeSearching(false);
+    }
   };
 
   const handleClearFilters = () => {
@@ -210,8 +246,10 @@ export const ProductPage = () => {
         <BarcodeSearch
           value={barcodeQuery}
           onChange={setBarcodeQuery}
-          onSearch={handleSearch}
-          isLoading={isLoading}
+          onSearch={(value) => {
+            void handleBarcodeSearch(value);
+          }}
+          isLoading={isLoading || isBarcodeSearching}
         />
 
         {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
