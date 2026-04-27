@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import '../styles/products.css';
+import { brandsApi, categoriesApi } from '../api/catalog.api';
 import { productsApi } from '../api/products.api';
 import { BarcodeSearch } from '../components/BarcodeSearch';
 import { ProductDetails } from '../components/ProductDetails';
@@ -27,17 +28,19 @@ export const ProductPage = () => {
   const [brandFilter, setBrandFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | 'true' | 'false'>('');
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [modalState, setModalState] = useState<ProductModalState>(defaultModalState);
 
-  const brandOptions = useMemo(
+  const fallbackBrandOptions = useMemo(
     () => Array.from(new Set(products.map((product) => product.brand))).sort(),
     [products],
   );
 
-  const categoryOptions = useMemo(
+  const fallbackCategoryOptions = useMemo(
     () => Array.from(new Set(products.map((product) => product.category))).sort(),
     [products],
   );
@@ -88,6 +91,24 @@ export const ProductPage = () => {
   useEffect(() => {
     void fetchProducts();
   }, [fetchProducts]);
+
+  const fetchCatalogs = useCallback(async () => {
+    try {
+      const [brandsResponse, categoriesResponse] = await Promise.all([
+        brandsApi.getAll({ page: 1, limit: 100 }),
+        categoriesApi.getAll({ page: 1, limit: 100 }),
+      ]);
+
+      setBrandOptions(brandsResponse.items.map((brand) => brand.name));
+      setCategoryOptions(categoriesResponse.items.map((category) => category.name));
+    } catch {
+      // Keep fallback options derived from current products.
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchCatalogs();
+  }, [fetchCatalogs]);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
@@ -211,7 +232,7 @@ export const ProductPage = () => {
                 }}
               >
                 <option value="">All</option>
-                {brandOptions.map((brand) => (
+                {(brandOptions.length > 0 ? brandOptions : fallbackBrandOptions).map((brand) => (
                   <option key={brand} value={brand}>
                     {brand}
                   </option>
@@ -233,7 +254,10 @@ export const ProductPage = () => {
                 }}
               >
                 <option value="">All</option>
-                {categoryOptions.map((category) => (
+                {(categoryOptions.length > 0
+                  ? categoryOptions
+                  : fallbackCategoryOptions
+                ).map((category) => (
                   <option key={category} value={category}>
                     {category}
                   </option>
