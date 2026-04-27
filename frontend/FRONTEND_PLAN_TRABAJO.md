@@ -151,5 +151,14 @@ Regla de limpieza:
 - Refresco de catalogos (marcas/categorias) tras crear/editar.
 **Validacion:** `npm.cmd run lint` OK y `npm.cmd run build` OK.
 
+### Cambio 4 - Etapa 4 completada (cierre tecnico y UX)
+**Fecha:** 2026-04-27  
+**Resumen:** Se realizo el cierre tecnico del frontend:
+- Mejora de UX en feedback de acciones (mensajes de exito/error y estados vacios).
+- Mejoras de accesibilidad en acciones de tabla.
+- Limpieza final de campos de maqueta sin soporte backend en tipos y UI.
+- Alineacion completa de componentes a contrato real del backend.
+**Validacion:** `npm.cmd run lint` OK y `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Pendiente: `Cambio 4` (cierre tecnico, limpieza y ajustes finales de UX).
+- Pendiente: nuevos cambios segun requerimiento.
