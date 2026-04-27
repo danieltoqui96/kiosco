@@ -206,12 +206,33 @@ export const ProductPage = () => {
     });
   };
 
-  const handleDelete = (productId: number) => {
+  const handleDelete = async (productId: number) => {
     const product = products.find((item) => item.id === productId);
     if (!product) return;
-    window.alert(
-      `Delete flow for "${product.name}" will be connected in Stage 3.`,
+
+    const shouldDelete = window.confirm(
+      `Do you want to delete "${product.name}"?`,
     );
+    if (!shouldDelete) return;
+
+    setErrorMessage(null);
+    setIsLoading(true);
+
+    try {
+      await productsApi.remove(productId);
+
+      if (selectedProductId === productId) {
+        setSelectedProductId(null);
+      }
+
+      await fetchProducts();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to delete product.';
+      setErrorMessage(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmitProduct = async (values: ProductFormValues) => {
@@ -388,7 +409,9 @@ export const ProductPage = () => {
             setIsDetailOpen(true);
           }}
           onEditProduct={handleOpenEdit}
-          onDeleteProduct={handleDelete}
+          onDeleteProduct={(productId) => {
+            void handleDelete(productId);
+          }}
           currentPage={page}
           totalPages={totalPages}
           totalItems={totalItems}
@@ -413,7 +436,9 @@ export const ProductPage = () => {
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         onEdit={handleOpenEdit}
-        onDelete={handleDelete}
+        onDelete={(productId) => {
+          void handleDelete(productId);
+        }}
       />
 
       <ProductFormModal
