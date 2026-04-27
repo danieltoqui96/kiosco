@@ -131,5 +131,15 @@ Regla de limpieza:
 - Activacion de `products.css` como entrypoint de estilos del feature.
 **Validacion:** `npm.cmd run lint` OK y `npm.cmd run build` OK.
 
+### Cambio 2 - Etapa 2 completada (lectura real desde backend)
+**Fecha:** 2026-04-27  
+**Resumen:** Se conecto el frontend a datos reales del backend para lectura:
+- Cliente HTTP tipado y servicios API para `products`, `brands` y `categories`.
+- `ProductPage` conectado a `GET /products` con filtros y paginacion server-side.
+- Carga de catalogos reales para filtros de marca y categoria.
+- Busqueda exacta por codigo de barras con `GET /products/codebar/:codebar`.
+- Fallback a busqueda general cuando el codigo no existe.
+**Validacion:** `npm.cmd run lint` OK y `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Pendiente: `Cambio 2` (integracion de lectura con backend real).
+- Pendiente: `Cambio 3` (conexion CRUD real: crear, editar y eliminar productos).
