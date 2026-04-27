@@ -81,8 +81,7 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
   const singularLabel = mode === 'brands' ? 'Marca' : 'Categoria';
   const pluralLabel = mode === 'brands' ? 'Marcas' : 'Categorias';
   const singularLabelLower = singularLabel.toLowerCase();
-  const canDeleteSelected =
-    selectedItem !== null && selectedItem.productsCount === 0 && !isDeleting;
+  const canDeleteSelected = selectedItem !== null && selectedItem.productsCount === 0;
 
   const syncCatalogRoute = useCallback(
     (next: Partial<CatalogRouteState>) => {
@@ -479,18 +478,19 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
                 <th className="table-cell table-cell--header table-cell--right">
                   Cantidad productos
                 </th>
+                <th className="table-cell table-cell--header">Estado</th>
               </tr>
             </thead>
             <tbody className="table-body">
               {isListLoading ? (
                 <tr className="table-row">
-                  <td className="table-cell" colSpan={3}>
+                  <td className="table-cell" colSpan={4}>
                     Cargando {pluralLabel.toLowerCase()}...
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr className="table-row">
-                  <td className="table-cell" colSpan={3}>
+                  <td className="table-cell" colSpan={4}>
                     No hay {pluralLabel.toLowerCase()} para mostrar.
                   </td>
                 </tr>
@@ -520,6 +520,17 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
                       <td className="table-cell">{item.name}</td>
                       <td className="table-cell table-cell--right table-cell--number">
                         {item.productsCount}
+                      </td>
+                      <td className="table-cell">
+                        <span
+                          className={`status-badge ${
+                            item.productsCount > 0
+                              ? 'status-badge--active'
+                              : 'status-badge--inactive'
+                          }`}
+                        >
+                          {item.productsCount > 0 ? 'Con productos' : 'Sin productos'}
+                        </span>
                       </td>
                     </tr>
                   );
@@ -676,21 +687,18 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
           >
             Editar {singularLabel.toLowerCase()}
           </button>
-          <button
-            type="button"
-            className="btn btn-danger-outline"
-            onClick={() => {
-              void handleDeleteSelected();
-            }}
-            disabled={!canDeleteSelected}
-            title={
-              selectedItem && selectedItem.productsCount > 0
-                ? `Solo se puede eliminar cuando la cantidad de productos es 0.`
-                : 'Eliminar'
-            }
-          >
-            {isDeleting ? 'Eliminando...' : `Eliminar ${singularLabel.toLowerCase()}`}
-          </button>
+          {canDeleteSelected ? (
+            <button
+              type="button"
+              className="btn btn-danger-outline"
+              onClick={() => {
+                void handleDeleteSelected();
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Eliminando...' : `Eliminar ${singularLabel.toLowerCase()}`}
+            </button>
+          ) : null}
         </div>
       </aside>
 
