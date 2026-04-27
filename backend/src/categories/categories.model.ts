@@ -20,17 +20,28 @@ export class CategoriesModel {
     pagination: PaginationParams,
     search?: string,
   ): Promise<PaginatedResult<Category>> {
-    const whereSql = search ? 'WHERE name LIKE ?' : '';
+    const whereSql = search ? 'WHERE c.name LIKE ?' : '';
     const whereParams: unknown[] = search ? [`%${search}%`] : [];
 
     const [countRows] = await pool.query<CountRow[]>(
-      `SELECT COUNT(*) AS total FROM categories ${whereSql}`,
+      `SELECT COUNT(*) AS total FROM categories c ${whereSql}`,
       whereParams,
     );
     const total = countRows[0]?.total ?? 0;
 
     const [rows] = await pool.query<CategoryDB[]>(
-      `SELECT * FROM categories ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      `
+        SELECT
+          c.id,
+          c.name,
+          COUNT(p.id) AS productsCount
+        FROM categories c
+        LEFT JOIN products p ON p.category_id = c.id
+        ${whereSql}
+        GROUP BY c.id, c.name
+        ORDER BY c.id DESC
+        LIMIT ? OFFSET ?
+      `,
       [...whereParams, pagination.limit, pagination.offset],
     );
 

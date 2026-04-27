@@ -100,19 +100,6 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
     [mode],
   );
 
-  const fetchProductsCountByName = useCallback(
-    async (name: string): Promise<number> => {
-      const response = await productsApi.getAll({
-        page: 1,
-        limit: 1,
-        ...getProductsFilter(name),
-      });
-
-      return response.total;
-    },
-    [getProductsFilter],
-  );
-
   const fetchCatalogItems = useCallback(async () => {
     setIsListLoading(true);
     setListError(null);
@@ -144,13 +131,11 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
       }
 
       const entities = response.items as CatalogEntity[];
-      const withCounts = await Promise.all(
-        entities.map(async (item) => ({
-          id: item.id,
-          name: item.name,
-          productsCount: await fetchProductsCountByName(item.name).catch(() => 0),
-        })),
-      );
+      const withCounts = entities.map((item) => ({
+        id: item.id,
+        name: item.name,
+        productsCount: item.productsCount ?? 0,
+      }));
 
       setItems(withCounts);
       setTotalItems(response.total);
@@ -184,7 +169,6 @@ export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPag
       setIsListLoading(false);
     }
   }, [
-    fetchProductsCountByName,
     mode,
     page,
     pluralLabel,

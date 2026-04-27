@@ -105,6 +105,27 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     ],
   );
 
+  const syncProductRoutePage = useCallback(
+    (nextPage: number) => {
+      onRouteStateChange({
+        page: nextPage,
+        search: searchFilter,
+        brand: brandFilter,
+        category: categoryFilter,
+        status: statusFilter,
+        codebar: routeState.codebar,
+      });
+    },
+    [
+      brandFilter,
+      categoryFilter,
+      onRouteStateChange,
+      routeState.codebar,
+      searchFilter,
+      statusFilter,
+    ],
+  );
+
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -124,13 +145,13 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
 
       if (response.totalPages === 0 && page !== 1) {
         setPage(1);
-        syncProductRoute({ page: 1 });
+        syncProductRoutePage(1);
         return;
       }
 
       if (response.totalPages > 0 && page > response.totalPages) {
         setPage(response.totalPages);
-        syncProductRoute({ page: response.totalPages });
+        syncProductRoutePage(response.totalPages);
         return;
       }
 
@@ -154,7 +175,7 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     page,
     searchFilter,
     statusFilter,
-    syncProductRoute,
+    syncProductRoutePage,
   ]);
 
   useEffect(() => {

@@ -16,17 +16,28 @@ export class BrandsModel {
     pagination: PaginationParams,
     search?: string,
   ): Promise<PaginatedResult<Brand>> {
-    const whereSql = search ? 'WHERE name LIKE ?' : '';
+    const whereSql = search ? 'WHERE b.name LIKE ?' : '';
     const whereParams: unknown[] = search ? [`%${search}%`] : [];
 
     const [countRows] = await pool.query<CountRow[]>(
-      `SELECT COUNT(*) AS total FROM brands ${whereSql}`,
+      `SELECT COUNT(*) AS total FROM brands b ${whereSql}`,
       whereParams,
     );
     const total = countRows[0]?.total ?? 0;
 
     const [rows] = await pool.query<BrandDB[]>(
-      `SELECT * FROM brands ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`,
+      `
+        SELECT
+          b.id,
+          b.name,
+          COUNT(p.id) AS productsCount
+        FROM brands b
+        LEFT JOIN products p ON p.brand_id = b.id
+        ${whereSql}
+        GROUP BY b.id, b.name
+        ORDER BY b.id DESC
+        LIMIT ? OFFSET ?
+      `,
       [...whereParams, pagination.limit, pagination.offset],
     );
 

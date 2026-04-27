@@ -27,11 +27,13 @@ export interface Product {
 export interface Brand {
   id: number;
   name: string;
+  productsCount?: number;
 }
 
 export interface Category {
   id: number;
   name: string;
+  productsCount?: number;
 }
 
 export interface ProductFormValues {

@@ -1,6 +1,6 @@
 import type { Product, ProductUiDerived, ProductViewModel } from './types';
 
-const DEFAULT_LOW_STOCK_THRESHOLD = 5;
+const DEFAULT_LOW_STOCK_THRESHOLD = 10;
 
 export function formatCurrency(
   amount: number,

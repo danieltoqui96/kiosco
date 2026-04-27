@@ -31,6 +31,17 @@ const defaultProductsSearch: RouterSearchState = {
   page: 1,
 };
 
+const PRODUCT_QUERY_KEYS = new Set([
+  'page',
+  'search',
+  'brand',
+  'category',
+  'status',
+  'codebar',
+]);
+
+const CATALOG_QUERY_KEYS = new Set(['page', 'q']);
+
 function parsePage(rawValue: unknown): number {
   const parsedValue =
     typeof rawValue === 'number'
@@ -126,6 +137,47 @@ function isSameSearchState(left: RouterSearchState, right: RouterSearchState): b
   );
 }
 
+function isQueryCanonical(
+  section: SectionPath,
+  search: RouterSearchState,
+): boolean {
+  if (typeof window === 'undefined') return true;
+
+  const params = new URLSearchParams(window.location.search);
+  const allowedKeys = section === 'productos' ? PRODUCT_QUERY_KEYS : CATALOG_QUERY_KEYS;
+
+  for (const key of params.keys()) {
+    if (!allowedKeys.has(key)) return false;
+    if (params.getAll(key).length > 1) return false;
+  }
+
+  const expectedValues: Record<string, string | undefined> =
+    section === 'productos'
+      ? {
+          page: String(search.page),
+          search: search.search,
+          brand: search.brand,
+          category: search.category,
+          status: search.status,
+          codebar: search.codebar,
+        }
+      : {
+          page: String(search.page),
+          q: search.q,
+        };
+
+  for (const [key, expectedValue] of Object.entries(expectedValues)) {
+    const actualValue = params.get(key);
+    if (expectedValue === undefined) {
+      if (actualValue !== null) return false;
+    } else if (actualValue !== expectedValue) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
 });
@@ -170,9 +222,10 @@ function SectionView() {
   const sectionPath = getSectionPath(section);
   const currentSection = toSection(sectionPath);
   const currentSearch = sanitizeSearchForSection(sectionPath, rawSearch);
+  const queryIsCanonical = isQueryCanonical(sectionPath, currentSearch);
 
   useEffect(() => {
-    if (isSameSearchState(rawSearch, currentSearch)) return;
+    if (queryIsCanonical && isSameSearchState(rawSearch, currentSearch)) return;
 
     void navigate({
       to: '/$section',
@@ -180,7 +233,7 @@ function SectionView() {
       search: currentSearch,
       replace: true,
     });
-  }, [currentSearch, navigate, rawSearch, sectionPath]);
+  }, [currentSearch, navigate, queryIsCanonical, rawSearch, sectionPath]);
 
   const updateSearch = useCallback(
     (patch: Partial<RouterSearchState>) => {
