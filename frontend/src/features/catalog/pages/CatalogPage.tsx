@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../../products/styles/products.css';
 import { brandsApi, categoriesApi } from '../../products/api/catalog.api';
 import { productsApi } from '../../products/api/products.api';
@@ -8,6 +8,7 @@ import type {
   Product,
   ProductQueryParams,
 } from '../../products/types';
+import type { CatalogRouteState } from '../../../components/layout/MainLayout';
 
 type CatalogMode = 'brands' | 'categories';
 
@@ -27,6 +28,8 @@ interface DetailProduct {
 
 interface CatalogPageProps {
   mode: CatalogMode;
+  routeState: CatalogRouteState;
+  onRouteStateChange: (next: Partial<CatalogRouteState>) => void;
 }
 
 const LIST_PAGE_SIZE = 10;
@@ -52,13 +55,13 @@ function mapDetailProduct(product: Product): DetailProduct {
   };
 }
 
-export const CatalogPage = ({ mode }: CatalogPageProps) => {
+export const CatalogPage = ({ mode, routeState, onRouteStateChange }: CatalogPageProps) => {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [detailProducts, setDetailProducts] = useState<DetailProduct[]>([]);
-  const [searchInput, setSearchInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState(routeState.q);
+  const [searchQuery, setSearchQuery] = useState(routeState.q);
+  const [page, setPage] = useState(routeState.page);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isListLoading, setIsListLoading] = useState(false);
@@ -73,7 +76,7 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [formName, setFormName] = useState('');
-  const selectedItemId = selectedItem?.id ?? null;
+  const selectedItemRef = useRef<CatalogItem | null>(null);
 
   const singularLabel = mode === 'brands' ? 'Marca' : 'Categoria';
   const pluralLabel = mode === 'brands' ? 'Marcas' : 'Categorias';
@@ -141,23 +144,18 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
       setTotalItems(response.total);
       setTotalPages(response.totalPages);
 
-      if (selectedItemId && !withCounts.some((item) => item.id === selectedItemId)) {
-        setSelectedItem(null);
-        setDetailProducts([]);
-      }
-      if (selectedItemId) {
-        const refreshedSelected = withCounts.find((item) => item.id === selectedItemId);
-        if (refreshedSelected) {
-          setSelectedItem((current) => {
-            if (!current || current.id !== refreshedSelected.id) return current;
-            if (
-              current.name === refreshedSelected.name &&
-              current.productsCount === refreshedSelected.productsCount
-            ) {
-              return current;
-            }
-            return refreshedSelected;
-          });
+      const currentSelected = selectedItemRef.current;
+      if (currentSelected) {
+        const refreshedSelected = withCounts.find((item) => item.id === currentSelected.id);
+
+        if (!refreshedSelected) {
+          setSelectedItem(null);
+          setDetailProducts([]);
+        } else if (
+          currentSelected.name !== refreshedSelected.name ||
+          currentSelected.productsCount !== refreshedSelected.productsCount
+        ) {
+          setSelectedItem(refreshedSelected);
         }
       }
     } catch (error) {
@@ -172,7 +170,7 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
     } finally {
       setIsListLoading(false);
     }
-  }, [fetchProductsCountByName, mode, page, pluralLabel, searchQuery, selectedItemId]);
+  }, [fetchProductsCountByName, mode, page, pluralLabel, searchQuery]);
 
   const openCreateModal = () => {
     setActionError(null);
@@ -342,16 +340,31 @@ export const CatalogPage = ({ mode }: CatalogPageProps) => {
   );
 
   useEffect(() => {
-    setPage(1);
-    setSearchInput('');
-    setSearchQuery('');
+    selectedItemRef.current = selectedItem;
+  }, [selectedItem]);
+
+  useEffect(() => {
+    if (page !== routeState.page) setPage(routeState.page);
+    if (searchQuery !== routeState.q) setSearchQuery(routeState.q);
+    if (searchInput !== routeState.q) setSearchInput(routeState.q);
+  }, [page, routeState.page, routeState.q, searchInput, searchQuery]);
+
+  useEffect(() => {
+    if (page === routeState.page && searchQuery === routeState.q) return;
+    onRouteStateChange({ page, q: searchQuery });
+  }, [onRouteStateChange, page, routeState.page, routeState.q, searchQuery]);
+
+  useEffect(() => {
+    setPage(routeState.page);
+    setSearchInput(routeState.q);
+    setSearchQuery(routeState.q);
     setSelectedItem(null);
     setDetailProducts([]);
     setActionError(null);
     setActionSuccess(null);
     setIsFormOpen(false);
     setFormName('');
-  }, [mode]);
+  }, [mode, routeState.page, routeState.q]);
 
   useEffect(() => {
     void fetchCatalogItems();

@@ -9,6 +9,7 @@ import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductTable } from '../components/ProductTable';
 import { toProductViewModel } from '../presentation.utils';
 import type { ProductFormValues, ProductModalState, ProductViewModel } from '../types';
+import type { ProductRouteState } from '../../../components/layout/MainLayout';
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -17,6 +18,11 @@ const defaultModalState: ProductModalState = {
   mode: 'create',
   editingProductId: null,
 };
+
+interface ProductPageProps {
+  routeState: ProductRouteState;
+  onRouteStateChange: (next: Partial<ProductRouteState>) => void;
+}
 
 function buildUpdatePayload(
   nextValues: ProductFormValues,
@@ -38,7 +44,7 @@ function buildUpdatePayload(
   return payload;
 }
 
-export const ProductPage = () => {
+export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps) => {
   const [products, setProducts] = useState<ProductViewModel[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(true);
@@ -47,14 +53,14 @@ export const ProductPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [barcodeQuery, setBarcodeQuery] = useState('');
-  const [searchFilter, setSearchFilter] = useState('');
-  const [brandFilter, setBrandFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'' | 'true' | 'false'>('');
+  const [barcodeQuery, setBarcodeQuery] = useState(routeState.codebar);
+  const [searchFilter, setSearchFilter] = useState(routeState.search);
+  const [brandFilter, setBrandFilter] = useState(routeState.brand);
+  const [categoryFilter, setCategoryFilter] = useState(routeState.category);
+  const [statusFilter, setStatusFilter] = useState<'' | 'true' | 'false'>(routeState.status);
   const [brandOptions, setBrandOptions] = useState<string[]>([]);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(routeState.page);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [modalState, setModalState] = useState<ProductModalState>(defaultModalState);
@@ -123,6 +129,63 @@ export const ProductPage = () => {
   useEffect(() => {
     void fetchProducts();
   }, [fetchProducts]);
+
+  useEffect(() => {
+    if (page !== routeState.page) setPage(routeState.page);
+    if (searchFilter !== routeState.search) setSearchFilter(routeState.search);
+    if (brandFilter !== routeState.brand) setBrandFilter(routeState.brand);
+    if (categoryFilter !== routeState.category) setCategoryFilter(routeState.category);
+    if (statusFilter !== routeState.status) setStatusFilter(routeState.status);
+    if (barcodeQuery !== routeState.codebar) setBarcodeQuery(routeState.codebar);
+  }, [
+    barcodeQuery,
+    brandFilter,
+    categoryFilter,
+    page,
+    routeState.brand,
+    routeState.category,
+    routeState.codebar,
+    routeState.page,
+    routeState.search,
+    routeState.status,
+    searchFilter,
+    statusFilter,
+  ]);
+
+  useEffect(() => {
+    const isAlreadySyncedWithRoute =
+      page === routeState.page &&
+      searchFilter === routeState.search &&
+      brandFilter === routeState.brand &&
+      categoryFilter === routeState.category &&
+      statusFilter === routeState.status &&
+      barcodeQuery === routeState.codebar;
+
+    if (isAlreadySyncedWithRoute) return;
+
+    onRouteStateChange({
+      page,
+      search: searchFilter,
+      brand: brandFilter,
+      category: categoryFilter,
+      status: statusFilter,
+      codebar: barcodeQuery,
+    });
+  }, [
+    barcodeQuery,
+    brandFilter,
+    categoryFilter,
+    onRouteStateChange,
+    page,
+    routeState.brand,
+    routeState.category,
+    routeState.codebar,
+    routeState.page,
+    routeState.search,
+    routeState.status,
+    searchFilter,
+    statusFilter,
+  ]);
 
   const fetchCatalogs = useCallback(async () => {
     try {
