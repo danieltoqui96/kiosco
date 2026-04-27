@@ -141,5 +141,15 @@ Regla de limpieza:
 - Fallback a busqueda general cuando el codigo no existe.
 **Validacion:** `npm.cmd run lint` OK y `npm.cmd run build` OK.
 
+### Cambio 3 - Etapa 3 completada (CRUD real de productos)
+**Fecha:** 2026-04-27  
+**Resumen:** Se conectaron operaciones CRUD reales de productos en frontend:
+- Crear producto desde modal con `POST /products`.
+- Editar producto desde modal con `PUT /products/:id`.
+- Eliminar producto con confirmacion y `DELETE /products/:id`.
+- Recarga de listado despues de operaciones y sincronizacion de seleccion.
+- Refresco de catalogos (marcas/categorias) tras crear/editar.
+**Validacion:** `npm.cmd run lint` OK y `npm.cmd run build` OK.
+
 ## Proximos cambios
-- Pendiente: `Cambio 3` (conexion CRUD real: crear, editar y eliminar productos).
+- Pendiente: `Cambio 4` (cierre tecnico, limpieza y ajustes finales de UX).
