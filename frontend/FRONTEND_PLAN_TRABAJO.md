@@ -114,6 +114,21 @@ Regla de limpieza:
 - Validar compilacion/lint.
 - Registrar resumen de cambios por cada etapa en esta bitacora.
 
+### Etapa 5: Modulos de ventas y finanzas
+- Revisar contratos backend para ventas/finanzas y crear tipos frontend alineados.
+- Implementar modulo de ventas:
+  - listado de productos activos con stock y busqueda,
+  - carrito de venta con cantidades,
+  - confirmacion de venta y descuento de stock via API.
+- Implementar modulo de finanzas:
+  - resumen agrupado por dia,
+  - detalle del dia con ventas e items vendidos.
+- Integrar navegacion y rutas en TanStack Router para:
+  - `productos`, `categorias`, `marcas`, `ventas`, `finanzas`,
+  - query params por modulo (sin mezclar filtros entre secciones).
+- Ajustar estilos para mantener consistencia visual entre modulos.
+- Validar lint/build en frontend y build en backend.
+
 ## Bitacora de cambios y resumenes
 
 ### Cambio 0 - Documento de seguimiento creado
@@ -160,5 +175,27 @@ Regla de limpieza:
 - Alineacion completa de componentes a contrato real del backend.
 **Validacion:** `npm.cmd run lint` OK y `npm.cmd run build` OK.
 
+### Cambio 5 - Etapa 5 completada (ventas + finanzas integrados)
+**Fecha:** 2026-04-27  
+**Resumen:** Se implementaron y conectaron los modulos nuevos:
+- Backend:
+  - nuevas rutas `/sales` y `/finance` registradas en el router principal.
+  - modulo `sales` con:
+    - `GET /sales/products` (productos activos con stock),
+    - `POST /sales` (crea venta y descuenta stock),
+    - `GET /sales/:id` (detalle de venta).
+  - modulo `finance` con:
+    - `GET /finance/daily` (resumen diario),
+    - `GET /finance/daily/:day` (detalle por dia).
+  - script SQL para tablas `sales` y `sale_items`.
+- Frontend:
+  - nueva navegacion lateral para `Ventas` y `Finanzas`.
+  - nueva `SalesPage` con busqueda, paginacion, carrito y confirmacion de venta.
+  - nueva `FinancePage` con filtros de fecha, resumen diario y detalle de ventas/items.
+  - extension de TanStack Router para nuevas secciones y estado de busqueda en URL por modulo.
+- Estilos:
+  - ajustes de clases compartidas para inputs de fecha y secciones de detalle.
+**Validacion:** `npm.cmd run lint` OK, `npx.cmd tsc -b` OK, `npm.cmd run build` (frontend) OK, `npm.cmd run build` (backend) OK.
+
 ## Proximos cambios
-- Pendiente: nuevos cambios segun requerimiento.
+- Pendiente: iteraciones de UX y reglas de negocio adicionales segun feedback.

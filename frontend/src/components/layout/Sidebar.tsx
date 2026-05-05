@@ -1,8 +1,8 @@
-import type { CatalogSection } from './MainLayout';
+import type { AppSection } from './MainLayout';
 
 interface SidebarProps {
-  currentSection: CatalogSection;
-  onNavigate: (section: CatalogSection) => void;
+  currentSection: AppSection;
+  onNavigate: (section: AppSection) => void;
 }
 
 export const Sidebar = ({ currentSection, onNavigate }: SidebarProps) => {
@@ -38,6 +38,22 @@ export const Sidebar = ({ currentSection, onNavigate }: SidebarProps) => {
           >
             <span className="nav-icon">M</span>
             <span className="nav-label">Marcas</span>
+          </button>
+          <button
+            type="button"
+            className={`nav-item${currentSection === 'sales' ? ' active' : ''}`}
+            onClick={() => onNavigate('sales')}
+          >
+            <span className="nav-icon">V</span>
+            <span className="nav-label">Ventas</span>
+          </button>
+          <button
+            type="button"
+            className={`nav-item${currentSection === 'finance' ? ' active' : ''}`}
+            onClick={() => onNavigate('finance')}
+          >
+            <span className="nav-icon">F</span>
+            <span className="nav-label">Finanzas</span>
           </button>
         </nav>
       </aside>

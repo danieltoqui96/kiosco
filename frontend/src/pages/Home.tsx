@@ -1,18 +1,24 @@
 import {
-  MainLayout,
+  type AppSection,
   type CatalogRouteState,
-  type CatalogSection,
+  type FinanceRouteState,
+  MainLayout,
   type ProductRouteState,
+  type SalesRouteState,
 } from '../components/layout/MainLayout';
 import { Sidebar } from '../components/layout/Sidebar';
 
 interface HomeProps {
-  section: CatalogSection;
-  onNavigate: (section: CatalogSection) => void;
+  section: AppSection;
+  onNavigate: (section: AppSection) => void;
   productRouteState: ProductRouteState;
   onProductRouteStateChange: (next: Partial<ProductRouteState>) => void;
   catalogRouteState: CatalogRouteState;
   onCatalogRouteStateChange: (next: Partial<CatalogRouteState>) => void;
+  salesRouteState: SalesRouteState;
+  onSalesRouteStateChange: (next: Partial<SalesRouteState>) => void;
+  financeRouteState: FinanceRouteState;
+  onFinanceRouteStateChange: (next: Partial<FinanceRouteState>) => void;
 }
 
 export const Home = ({
@@ -22,6 +28,10 @@ export const Home = ({
   onProductRouteStateChange,
   catalogRouteState,
   onCatalogRouteStateChange,
+  salesRouteState,
+  onSalesRouteStateChange,
+  financeRouteState,
+  onFinanceRouteStateChange,
 }: HomeProps) => {
   return (
     <div className="app-layout">
@@ -32,6 +42,10 @@ export const Home = ({
         onProductRouteStateChange={onProductRouteStateChange}
         catalogRouteState={catalogRouteState}
         onCatalogRouteStateChange={onCatalogRouteStateChange}
+        salesRouteState={salesRouteState}
+        onSalesRouteStateChange={onSalesRouteStateChange}
+        financeRouteState={financeRouteState}
+        onFinanceRouteStateChange={onFinanceRouteStateChange}
       />
     </div>
   );
