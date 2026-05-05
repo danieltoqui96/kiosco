@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SalesRouteState } from '../../../components/layout/MainLayout';
 import '../../products/styles/products.css';
-import { formatCurrency } from '../../products/presentation.utils';
+import {
+  formatCurrency,
+  getStockAlertLabel,
+  getStockStatus,
+} from '../../products/presentation.utils';
 import { salesApi } from '../api/sales.api';
 import type { SaleProduct } from '../types';
 
@@ -307,48 +311,65 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
           <table className="data-table">
             <thead className="table-header">
               <tr>
-                <th className="table-cell table-cell--header">Codigo</th>
                 <th className="table-cell table-cell--header">Producto</th>
                 <th className="table-cell table-cell--header">Marca</th>
                 <th className="table-cell table-cell--header">Categoria</th>
+                <th className="table-cell table-cell--header">Codigo</th>
                 <th className="table-cell table-cell--header table-cell--right">
                   Precio
                 </th>
                 <th className="table-cell table-cell--header table-cell--right">
-                  Stock
+                  Unidades
                 </th>
+                <th className="table-cell table-cell--header">Stock</th>
                 <th className="table-cell table-cell--header">Accion</th>
               </tr>
             </thead>
             <tbody className="table-body">
               {isLoading ? (
                 <tr className="table-row">
-                  <td className="table-cell" colSpan={7}>
+                  <td className="table-cell" colSpan={8}>
                     Cargando productos para venta...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr className="table-row">
-                  <td className="table-cell" colSpan={7}>
+                  <td className="table-cell" colSpan={8}>
                     No hay productos activos para vender.
                   </td>
                 </tr>
               ) : (
                 products.map((product) => {
                   const inCart = cartQuantityByProductId.get(product.id) ?? 0;
-                  const canAdd = inCart < product.stock;
+                  const availableStock = Math.max(0, product.stock - inCart);
+                  const canAdd = availableStock > 0;
+                  const stockStatus = getStockStatus(availableStock);
+                  const stockAlertLabel = getStockAlertLabel(stockStatus);
 
                   return (
                     <tr key={product.id} className="table-row">
-                      <td className="table-cell table-cell--code">{product.codebar}</td>
-                      <td className="table-cell">{product.name}</td>
+                      <td className="table-cell">
+                        <div className="product-cell">
+                          <div className="product-info">
+                            <span className="product-name">{product.name}</span>
+                          </div>
+                        </div>
+                      </td>
                       <td className="table-cell">{product.brand}</td>
-                      <td className="table-cell">{product.category}</td>
+                      <td className="table-cell">
+                        <span className="category-badge">{product.category}</span>
+                      </td>
+                      <td className="table-cell table-cell--code">{product.codebar}</td>
                       <td className="table-cell table-cell--right table-cell--number">
                         {formatCurrency(product.salePrice)}
                       </td>
                       <td className="table-cell table-cell--right table-cell--number">
-                        {product.stock}
+                        {availableStock}
+                      </td>
+                      <td className="table-cell">
+                        <span className={`stock-indicator stock-indicator--${stockStatus}`}>
+                          {stockAlertLabel ?? 'Normal'}
+                        </span>
                       </td>
                       <td className="table-cell">
                         <button
