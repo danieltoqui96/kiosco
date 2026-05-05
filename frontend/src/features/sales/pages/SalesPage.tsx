@@ -1,244 +1,416 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SalesRouteState } from '../../../components/layout/MainLayout';
 import '../../products/styles/products.css';
-import {
-  formatCurrency,
-  getStockAlertLabel,
-  getStockStatus,
-} from '../../products/presentation.utils';
+import { formatCurrency } from '../../products/presentation.utils';
 import { salesApi } from '../api/sales.api';
-import type { SaleProduct } from '../types';
-
-interface CartItem {
-  product: SaleProduct;
-  quantity: number;
-}
-
-const PAGE_SIZE = 10;
+import type { PaymentMethod, Sale, SaleProduct, SaleSummary } from '../types';
 
 interface SalesPageProps {
   routeState: SalesRouteState;
   onRouteStateChange: (next: Partial<SalesRouteState>) => void;
 }
 
-function buildVisiblePages(currentPage: number, totalPages: number): number[] {
-  if (totalPages <= 5) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
+interface EditableSaleItem {
+  productId: number;
+  codebar: string;
+  name: string;
+  brand: string;
+  stock: number;
+  baseQuantity: number;
+  unitSalePrice: number;
+  quantity: number;
+}
 
-  if (currentPage <= 3) return [1, 2, 3, 4, totalPages];
-  if (currentPage >= totalPages - 2) {
-    return [1, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-  }
-  return [1, currentPage - 1, currentPage, currentPage + 1, totalPages];
+function formatDateTimeLabel(dateTimeIso: string): string {
+  return new Intl.DateTimeFormat('es-CL', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(dateTimeIso));
+}
+
+function toDatetimeLocal(isoDateTime: string): string {
+  const date = new Date(isoDateTime);
+  if (Number.isNaN(date.getTime())) return '';
+  const tzOffsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - tzOffsetMs).toISOString().slice(0, 16);
+}
+
+function fromDatetimeLocal(value: string): string | undefined {
+  if (!value.trim()) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+}
+
+function getEditableItemMaxQuantity(item: EditableSaleItem): number {
+  return Math.max(0, item.baseQuantity + item.stock);
+}
+
+function getEditableItemAvailableStock(item: EditableSaleItem): number {
+  return Math.max(0, getEditableItemMaxQuantity(item) - item.quantity);
+}
+
+function formatPaymentMethod(method: PaymentMethod): string {
+  return method === 'card' ? 'Tarjeta' : 'Efectivo';
 }
 
 export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) => {
-  const [products, setProducts] = useState<SaleProduct[]>([]);
-  const [cart, setCart] = useState<Record<number, CartItem>>({});
-  const [searchInput, setSearchInput] = useState(routeState.q);
-  const [searchQuery, setSearchQuery] = useState(routeState.q);
-  const [page, setPage] = useState(routeState.page);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [salesRows, setSalesRows] = useState<SaleSummary[]>([]);
+  const [selectedSaleId, setSelectedSaleId] = useState<number | null>(
+    routeState.saleId ? Number(routeState.saleId) : null,
+  );
+  const [saleDetail, setSaleDetail] = useState<Sale | null>(null);
+  const [fromInput, setFromInput] = useState(routeState.from);
+  const [toInput, setToInput] = useState(routeState.to);
+  const [fromQuery, setFromQuery] = useState(routeState.from);
+  const [toQuery, setToQuery] = useState(routeState.to);
+  const [isDetailOpen, setIsDetailOpen] = useState(true);
+  const [isListLoading, setIsListLoading] = useState(false);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isCartOpen, setIsCartOpen] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editSoldAt, setEditSoldAt] = useState('');
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>('cash');
+  const [editItems, setEditItems] = useState<EditableSaleItem[]>([]);
+  const [editSearchInput, setEditSearchInput] = useState('');
+  const [editSearchResults, setEditSearchResults] = useState<SaleProduct[]>([]);
+  const [isSearchingEditProducts, setIsSearchingEditProducts] = useState(false);
+  const [editSearchError, setEditSearchError] = useState<string | null>(null);
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createSoldAt, setCreateSoldAt] = useState('');
+  const [createPaymentMethod, setCreatePaymentMethod] = useState<PaymentMethod>('cash');
+  const [createItems, setCreateItems] = useState<EditableSaleItem[]>([]);
+  const [createSearchInput, setCreateSearchInput] = useState('');
+  const [createSearchResults, setCreateSearchResults] = useState<SaleProduct[]>([]);
+  const [isSearchingCreateProducts, setIsSearchingCreateProducts] = useState(false);
+  const [createSearchError, setCreateSearchError] = useState<string | null>(null);
 
   const syncSalesRoute = useCallback(
     (next: Partial<SalesRouteState>) => {
       onRouteStateChange({
-        page: next.page ?? page,
-        q: next.q ?? searchQuery,
+        from: next.from ?? fromQuery,
+        to: next.to ?? toQuery,
+        saleId:
+          next.saleId ??
+          (selectedSaleId !== null ? String(selectedSaleId) : ''),
       });
     },
-    [onRouteStateChange, page, searchQuery],
+    [fromQuery, onRouteStateChange, selectedSaleId, toQuery],
   );
 
   useEffect(() => {
-    setPage((current) => (current === routeState.page ? current : routeState.page));
-    setSearchQuery((current) => (current === routeState.q ? current : routeState.q));
-    setSearchInput((current) => (current === routeState.q ? current : routeState.q));
-  }, [routeState.page, routeState.q]);
+    setFromInput((current) => (current === routeState.from ? current : routeState.from));
+    setToInput((current) => (current === routeState.to ? current : routeState.to));
+    setFromQuery((current) => (current === routeState.from ? current : routeState.from));
+    setToQuery((current) => (current === routeState.to ? current : routeState.to));
 
-  const cartItems = useMemo(
-    () => Object.values(cart).sort((a, b) => a.product.name.localeCompare(b.product.name)),
-    [cart],
-  );
+    const nextSaleId = routeState.saleId ? Number(routeState.saleId) : null;
+    if (nextSaleId === null || Number.isNaN(nextSaleId)) {
+      setSelectedSaleId((current) => (current === null ? current : null));
+    } else {
+      setSelectedSaleId((current) => (current === nextSaleId ? current : nextSaleId));
+    }
+  }, [routeState.from, routeState.saleId, routeState.to]);
 
-  const cartItemsCount = useMemo(
-    () => cartItems.reduce((acc, item) => acc + item.quantity, 0),
-    [cartItems],
-  );
-
-  const cartTotal = useMemo(
-    () => cartItems.reduce((acc, item) => acc + item.quantity * item.product.salePrice, 0),
-    [cartItems],
-  );
-
-  const cartQuantityByProductId = useMemo(() => {
-    const map = new Map<number, number>();
-    cartItems.forEach((item) => {
-      map.set(item.product.id, item.quantity);
-    });
-    return map;
-  }, [cartItems]);
-
-  const fetchProducts = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  const fetchSales = useCallback(async () => {
+    setIsListLoading(true);
+    setListError(null);
 
     try {
-      const response = await salesApi.getProducts({
-        page,
-        limit: PAGE_SIZE,
-        search: searchQuery || undefined,
+      const response = await salesApi.getSales({
+        page: 1,
+        limit: 1000,
+        from: fromQuery || undefined,
+        to: toQuery || undefined,
       });
+      const sortedItems = [...response.items].sort((a, b) => b.id - a.id);
 
-      if (response.totalPages === 0 && page !== 1) {
-        setPage(1);
-        syncSalesRoute({ page: 1 });
+      setSalesRows(sortedItems);
+
+      if (sortedItems.length === 0) {
+        setSelectedSaleId(null);
+        setSaleDetail(null);
+        syncSalesRoute({ saleId: '' });
         return;
       }
 
-      if (response.totalPages > 0 && page > response.totalPages) {
-        setPage(response.totalPages);
-        syncSalesRoute({ page: response.totalPages });
-        return;
-      }
+      const hasCurrentSale =
+        selectedSaleId !== null &&
+        sortedItems.some((sale) => sale.id === selectedSaleId);
 
-      setProducts(response.items);
-      setTotalItems(response.total);
-      setTotalPages(response.totalPages);
+      if (hasCurrentSale) return;
+
+      const nextSaleId = sortedItems[0].id;
+      setSelectedSaleId(nextSaleId);
+      syncSalesRoute({ saleId: String(nextSaleId) });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudieron cargar ventas.';
+      setListError(message);
+      setSalesRows([]);
+      setSelectedSaleId(null);
+      setSaleDetail(null);
+    } finally {
+      setIsListLoading(false);
+    }
+  }, [fromQuery, selectedSaleId, syncSalesRoute, toQuery]);
+
+  const fetchSaleDetail = useCallback(async () => {
+    if (!selectedSaleId) {
+      setSaleDetail(null);
+      return;
+    }
+
+    setIsDetailLoading(true);
+    setDetailError(null);
+
+    try {
+      const detail = await salesApi.getSaleById(selectedSaleId);
+      setSaleDetail(detail);
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : 'No se pudieron cargar productos para venta.';
-      setErrorMessage(message);
-      setProducts([]);
-      setTotalItems(0);
-      setTotalPages(0);
+          : 'No se pudo cargar el detalle de la venta.';
+      setDetailError(message);
+      setSaleDetail(null);
     } finally {
-      setIsLoading(false);
+      setIsDetailLoading(false);
     }
-  }, [page, searchQuery, syncSalesRoute]);
+  }, [selectedSaleId]);
 
   useEffect(() => {
-    void fetchProducts();
-  }, [fetchProducts]);
+    void fetchSales();
+  }, [fetchSales]);
 
-  const addToCart = (product: SaleProduct) => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
+  useEffect(() => {
+    void fetchSaleDetail();
+  }, [fetchSaleDetail]);
 
-    setCart((current) => {
-      const existing = current[product.id];
-      const nextQuantity = (existing?.quantity ?? 0) + 1;
+  const selectedSaleSummary = useMemo(
+    () => salesRows.find((sale) => sale.id === selectedSaleId) ?? null,
+    [salesRows, selectedSaleId],
+  );
 
-      if (nextQuantity > product.stock) return current;
-
-      return {
-        ...current,
-        [product.id]: {
-          product,
-          quantity: nextQuantity,
-        },
-      };
-    });
-
-    setIsCartOpen(true);
+  const openCreateModal = () => {
+    setCreateSoldAt(toDatetimeLocal(new Date().toISOString()));
+    setCreatePaymentMethod('cash');
+    setCreateItems([]);
+    setCreateSearchInput('');
+    setCreateSearchResults([]);
+    setCreateSearchError(null);
+    setIsCreateModalOpen(true);
+    setActionMessage(null);
+    setDetailError(null);
   };
 
-  const increaseQuantity = (productId: number) => {
-    setCart((current) => {
-      const existing = current[productId];
-      if (!existing) return current;
-      if (existing.quantity >= existing.product.stock) return current;
-
-      return {
-        ...current,
-        [productId]: {
-          ...existing,
-          quantity: existing.quantity + 1,
-        },
-      };
-    });
+  const closeCreateModal = () => {
+    setIsCreateModalOpen(false);
+    setCreateSoldAt('');
+    setCreatePaymentMethod('cash');
+    setCreateItems([]);
+    setCreateSearchInput('');
+    setCreateSearchResults([]);
+    setCreateSearchError(null);
   };
 
-  const decreaseQuantity = (productId: number) => {
-    setCart((current) => {
-      const existing = current[productId];
-      if (!existing) return current;
+  const handleSearchProductsForCreate = async () => {
+    setIsSearchingCreateProducts(true);
+    setCreateSearchError(null);
 
-      if (existing.quantity <= 1) {
-        const next = { ...current };
-        delete next[productId];
-        return next;
-      }
-
-      return {
-        ...current,
-        [productId]: {
-          ...existing,
-          quantity: existing.quantity - 1,
-        },
-      };
-    });
+    try {
+      const response = await salesApi.getProducts({
+        page: 1,
+        limit: 10,
+        search: createSearchInput.trim() || undefined,
+      });
+      setCreateSearchResults(response.items);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudieron buscar productos.';
+      setCreateSearchError(message);
+      setCreateSearchResults([]);
+    } finally {
+      setIsSearchingCreateProducts(false);
+    }
   };
 
-  const removeFromCart = (productId: number) => {
-    setCart((current) => {
-      const next = { ...current };
-      delete next[productId];
-      return next;
-    });
-  };
+  const handleSaveCreate = async () => {
+    const normalizedItems = createItems
+      .map((item) => ({
+        productId: item.productId,
+        quantity: Math.max(0, Math.floor(item.quantity)),
+      }))
+      .filter((item) => item.quantity > 0);
 
-  const handleConfirmSale = async () => {
-    if (cartItems.length === 0) {
-      setErrorMessage('El carrito esta vacio.');
+    if (normalizedItems.length === 0) {
+      setDetailError('La venta debe tener al menos un item con cantidad mayor a 0.');
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
+    setDetailError(null);
+    setActionMessage(null);
 
     try {
-      const sale = await salesApi.createSale({
-        items: cartItems.map((item) => ({
-          productId: item.product.id,
-          quantity: item.quantity,
-        })),
+      const soldAtIso = fromDatetimeLocal(createSoldAt);
+      const created = await salesApi.createSale({
+        items: normalizedItems,
+        paymentMethod: createPaymentMethod,
+        soldAt: soldAtIso,
       });
 
-      setCart({});
-      setSuccessMessage(
-        `Venta #${sale.id} registrada. Total: ${formatCurrency(sale.totalSale)}.`,
-      );
+      closeCreateModal();
+      setActionMessage(`Venta #${created.id} registrada correctamente.`);
       window.dispatchEvent(new Event('inventory:changed'));
-
-      if (page !== 1) {
-        setPage(1);
-        syncSalesRoute({ page: 1 });
-      } else {
-        await fetchProducts();
-      }
+      window.dispatchEvent(new Event('cashbox:changed'));
+      await fetchSales();
+      setSelectedSaleId(created.id);
+      syncSalesRoute({ saleId: String(created.id) });
+      await fetchSaleDetail();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'No se pudo registrar la venta.';
-      setErrorMessage(message);
+      setDetailError(message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const visiblePages = useMemo(() => buildVisiblePages(page, totalPages), [page, totalPages]);
-  const rangeStart = totalItems === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(page * PAGE_SIZE, totalItems);
+  const openEditModal = () => {
+    if (!saleDetail) return;
+
+    setEditSoldAt(toDatetimeLocal(saleDetail.soldAt));
+    setEditPaymentMethod(saleDetail.paymentMethod);
+    setEditItems(
+      saleDetail.items.map((item) => ({
+        productId: item.productId,
+        codebar: item.codebar,
+        name: item.name,
+        brand: item.brand,
+        stock: item.stock,
+        baseQuantity: item.quantity,
+        unitSalePrice: item.unitSalePrice,
+        quantity: item.quantity,
+      })),
+    );
+    setEditSearchInput('');
+    setEditSearchResults([]);
+    setEditSearchError(null);
+    setIsEditModalOpen(true);
+    setActionMessage(null);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditSoldAt('');
+    setEditPaymentMethod('cash');
+    setEditItems([]);
+    setEditSearchInput('');
+    setEditSearchResults([]);
+    setEditSearchError(null);
+  };
+
+  const handleSearchProductsForEdit = async () => {
+    setIsSearchingEditProducts(true);
+    setEditSearchError(null);
+
+    try {
+      const response = await salesApi.getProducts({
+        page: 1,
+        limit: 10,
+        search: editSearchInput.trim() || undefined,
+      });
+      setEditSearchResults(response.items);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudieron buscar productos.';
+      setEditSearchError(message);
+      setEditSearchResults([]);
+    } finally {
+      setIsSearchingEditProducts(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!saleDetail) return;
+
+    const normalizedItems = editItems
+      .map((item) => ({
+        productId: item.productId,
+        quantity: Math.max(0, Math.floor(item.quantity)),
+      }))
+      .filter((item) => item.quantity > 0);
+
+    if (normalizedItems.length === 0) {
+      setDetailError('La venta debe tener al menos un item con cantidad mayor a 0.');
+      return;
+    }
+
+    const saleId = saleDetail.id;
+    const currentSoldAt = editSoldAt;
+    const currentItems = normalizedItems;
+    const currentPaymentMethod = editPaymentMethod;
+
+    setIsSubmitting(true);
+    setDetailError(null);
+    setActionMessage(null);
+
+    try {
+      const soldAtIso = fromDatetimeLocal(currentSoldAt);
+      const updated = await salesApi.updateSale(saleId, {
+        items: currentItems,
+        soldAt: soldAtIso,
+        paymentMethod: currentPaymentMethod,
+      });
+
+      closeEditModal();
+      setActionMessage(`Venta #${updated.id} actualizada correctamente.`);
+      window.dispatchEvent(new Event('inventory:changed'));
+      window.dispatchEvent(new Event('cashbox:changed'));
+      await fetchSales();
+      await fetchSaleDetail();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo actualizar la venta.';
+      setDetailError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteSale = async () => {
+    if (!saleDetail) return;
+
+    const shouldDelete = window.confirm(
+      `Deseas eliminar la venta #${saleDetail.id}? Esta accion restituira stock.`,
+    );
+    if (!shouldDelete) return;
+
+    setIsSubmitting(true);
+    setDetailError(null);
+    setActionMessage(null);
+
+    try {
+      await salesApi.deleteSale(saleDetail.id);
+      setActionMessage(`Venta #${saleDetail.id} eliminada correctamente.`);
+      setSaleDetail(null);
+      window.dispatchEvent(new Event('inventory:changed'));
+      window.dispatchEvent(new Event('cashbox:changed'));
+      await fetchSales();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo eliminar la venta.';
+      setDetailError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <>
@@ -252,24 +424,28 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
 
         <section className="filters-bar">
           <div className="filters-group">
-            <div className="filter-item">
-              <label className="filter-label" htmlFor="sales-search">
-                Buscar producto
+            <div className="filter-item filter-item--date">
+              <label className="filter-label" htmlFor="sales-from">
+                Desde
               </label>
               <input
-                id="sales-search"
+                id="sales-from"
                 className="form-input"
-                placeholder="Nombre, codigo, marca o categoria..."
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    const nextQuery = searchInput.trim();
-                    setSearchQuery(nextQuery);
-                    setPage(1);
-                    syncSalesRoute({ q: nextQuery, page: 1 });
-                  }
-                }}
+                type="date"
+                value={fromInput}
+                onChange={(event) => setFromInput(event.target.value)}
+              />
+            </div>
+            <div className="filter-item filter-item--date">
+              <label className="filter-label" htmlFor="sales-to">
+                Hasta
+              </label>
+              <input
+                id="sales-to"
+                className="form-input"
+                type="date"
+                value={toInput}
+                onChange={(event) => setToInput(event.target.value)}
               />
             </div>
           </div>
@@ -279,10 +455,15 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
               type="button"
               className="btn btn-primary"
               onClick={() => {
-                const nextQuery = searchInput.trim();
-                setSearchQuery(nextQuery);
-                setPage(1);
-                syncSalesRoute({ q: nextQuery, page: 1 });
+                const normalizedFrom = fromInput.trim();
+                const normalizedTo = toInput.trim();
+                setFromQuery(normalizedFrom);
+                setToQuery(normalizedTo);
+                syncSalesRoute({
+                  from: normalizedFrom,
+                  to: normalizedTo,
+                  saleId: '',
+                });
               }}
             >
               Buscar
@@ -291,96 +472,91 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
               type="button"
               className="btn btn-ghost"
               onClick={() => {
-                setSearchInput('');
-                setSearchQuery('');
-                setPage(1);
-                syncSalesRoute({ q: '', page: 1 });
+                setFromInput('');
+                setToInput('');
+                setFromQuery('');
+                setToQuery('');
+                syncSalesRoute({
+                  from: '',
+                  to: '',
+                  saleId: '',
+                });
               }}
             >
               Limpiar
             </button>
-            <span className="results-count">
-              Mostrando {products.length} de {totalItems} productos activos
-            </span>
+            <button type="button" className="btn btn-secondary" onClick={openCreateModal}>
+              Nueva venta
+            </button>
+            <span className="results-count">{salesRows.length} ventas en el rango</span>
           </div>
         </section>
 
-        {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
-        {successMessage ? <p className="form-success">{successMessage}</p> : null}
+        {listError ? <p className="form-error">{listError}</p> : null}
+        {actionMessage ? <p className="form-success">{actionMessage}</p> : null}
 
         <section className="data-table-container">
           <table className="data-table">
             <thead className="table-header">
               <tr>
-                <th className="table-cell table-cell--header">Producto</th>
-                <th className="table-cell table-cell--header">Marca</th>
-                <th className="table-cell table-cell--header">Categoria</th>
-                <th className="table-cell table-cell--header">Codigo</th>
-                <th className="table-cell table-cell--header table-cell--right">
-                  Precio
-                </th>
-                <th className="table-cell table-cell--header table-cell--right">
-                  Unidades
-                </th>
-                <th className="table-cell table-cell--header">Stock</th>
-                <th className="table-cell table-cell--header">Accion</th>
+                <th className="table-cell table-cell--header">ID</th>
+                <th className="table-cell table-cell--header">Fecha</th>
+                <th className="table-cell table-cell--header">Pago</th>
+                <th className="table-cell table-cell--header table-cell--right">Items</th>
+                <th className="table-cell table-cell--header table-cell--right">Total venta</th>
+                <th className="table-cell table-cell--header table-cell--right">Costo</th>
+                <th className="table-cell table-cell--header table-cell--right">Utilidad</th>
               </tr>
             </thead>
             <tbody className="table-body">
-              {isLoading ? (
+              {isListLoading ? (
                 <tr className="table-row">
-                  <td className="table-cell" colSpan={8}>
-                    Cargando productos para venta...
+                  <td className="table-cell" colSpan={7}>
+                    Cargando ventas...
                   </td>
                 </tr>
-              ) : products.length === 0 ? (
+              ) : salesRows.length === 0 ? (
                 <tr className="table-row">
-                  <td className="table-cell" colSpan={8}>
-                    No hay productos activos para vender.
+                  <td className="table-cell" colSpan={7}>
+                    No hay ventas en el rango seleccionado.
                   </td>
                 </tr>
               ) : (
-                products.map((product) => {
-                  const inCart = cartQuantityByProductId.get(product.id) ?? 0;
-                  const availableStock = Math.max(0, product.stock - inCart);
-                  const canAdd = availableStock > 0;
-                  const stockStatus = getStockStatus(availableStock);
-                  const stockAlertLabel = getStockAlertLabel(stockStatus);
-
+                salesRows.map((sale) => {
+                  const isSelected = selectedSaleId === sale.id;
                   return (
-                    <tr key={product.id} className="table-row">
-                      <td className="table-cell">
-                        <div className="product-cell">
-                          <div className="product-info">
-                            <span className="product-name">{product.name}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="table-cell">{product.brand}</td>
-                      <td className="table-cell">
-                        <span className="category-badge">{product.category}</span>
-                      </td>
-                      <td className="table-cell table-cell--code">{product.codebar}</td>
+                    <tr
+                      key={sale.id}
+                      className={`table-row table-row--clickable${isSelected ? ' table-row--selected' : ''}`}
+                      onClick={() => {
+                        setSelectedSaleId(sale.id);
+                        setIsDetailOpen(true);
+                        syncSalesRoute({ saleId: String(sale.id) });
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedSaleId(sale.id);
+                          setIsDetailOpen(true);
+                          syncSalesRoute({ saleId: String(sale.id) });
+                        }
+                      }}
+                      tabIndex={0}
+                    >
+                      <td className="table-cell table-cell--number">{sale.id}</td>
+                      <td className="table-cell">{formatDateTimeLabel(sale.soldAt)}</td>
+                      <td className="table-cell">{formatPaymentMethod(sale.paymentMethod)}</td>
                       <td className="table-cell table-cell--right table-cell--number">
-                        {formatCurrency(product.salePrice)}
+                        {sale.itemsCount}
                       </td>
                       <td className="table-cell table-cell--right table-cell--number">
-                        {availableStock}
+                        {formatCurrency(sale.totalSale)}
                       </td>
-                      <td className="table-cell">
-                        <span className={`stock-indicator stock-indicator--${stockStatus}`}>
-                          {stockAlertLabel ?? 'Normal'}
-                        </span>
+                      <td className="table-cell table-cell--right table-cell--number">
+                        {formatCurrency(sale.totalCost)}
                       </td>
-                      <td className="table-cell">
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => addToCart(product)}
-                          disabled={!canAdd || isSubmitting}
-                        >
-                          {canAdd ? 'Agregar' : 'Sin stock'}
-                        </button>
+                      <td className="table-cell table-cell--right table-cell--number">
+                        {formatCurrency(sale.profit)}
                       </td>
                     </tr>
                   );
@@ -388,159 +564,698 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
               )}
             </tbody>
           </table>
-
-          <div className="table-pagination">
-            <div className="pagination-info">
-              Mostrando {rangeStart}-{rangeEnd} de {totalItems} registros
-            </div>
-            <div className="pagination-controls">
-              <button
-                type="button"
-                className={`pagination-btn${page <= 1 ? ' pagination-btn--disabled' : ''}`}
-                onClick={() => {
-                  const nextPage = Math.max(1, page - 1);
-                  setPage(nextPage);
-                  syncSalesRoute({ page: nextPage });
-                }}
-                disabled={page <= 1}
-              >
-                Anterior
-              </button>
-              <span className="pagination-pages">
-                {visiblePages.map((visiblePage, index) => {
-                  const previousPage = visiblePages[index - 1];
-                  const needsEllipsis =
-                    previousPage !== undefined && visiblePage - previousPage > 1;
-
-                  return (
-                    <span key={visiblePage}>
-                      {needsEllipsis ? (
-                        <span className="pagination-ellipsis">...</span>
-                      ) : null}
-                      <button
-                        type="button"
-                        className={`pagination-page${page === visiblePage ? ' pagination-page--active' : ''}`}
-                        onClick={() => {
-                          setPage(visiblePage);
-                          syncSalesRoute({ page: visiblePage });
-                        }}
-                      >
-                        {visiblePage}
-                      </button>
-                    </span>
-                  );
-                })}
-              </span>
-              <button
-                type="button"
-                className={`pagination-btn${page >= totalPages ? ' pagination-btn--disabled' : ''}`}
-                onClick={() => {
-                  const nextPage = totalPages === 0 ? 1 : Math.min(totalPages, page + 1);
-                  setPage(nextPage);
-                  syncSalesRoute({ page: nextPage });
-                }}
-                disabled={page >= totalPages}
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
         </section>
       </main>
 
-      <aside className={`detail-panel${isCartOpen ? ' detail-panel--open' : ''}`}>
+      <aside className={`detail-panel${isDetailOpen ? ' detail-panel--open' : ''}`}>
         <div className="panel-header">
-          <h2 className="panel-title">Carrito</h2>
+          <h2 className="panel-title">Detalle de venta</h2>
           <button
             type="button"
             className="panel-close"
             title="Cerrar"
-            onClick={() => setIsCartOpen(false)}
+            onClick={() => setIsDetailOpen(false)}
           >
             x
           </button>
         </div>
 
         <div className="panel-content">
-          {cartItems.length === 0 ? (
+          {!selectedSaleSummary ? (
             <div className="detail-section">
-              <h4 className="section-title">Sin productos</h4>
+              <h4 className="section-title">Sin seleccion</h4>
               <p className="detail-description">
-                Agrega productos desde la lista para armar la venta.
+                Selecciona una venta de la tabla para ver su detalle.
               </p>
             </div>
           ) : (
-            <div className="detail-section">
-              <h4 className="section-title">Items del carrito</h4>
-              <div className="info-list">
-                {cartItems.map((item) => (
-                  <div key={item.product.id} className="info-row">
-                    <div>
-                      <div className="info-value">{item.product.name}</div>
-                      <div className="info-label">
-                        {formatCurrency(item.product.salePrice)} c/u
-                      </div>
+            <>
+              <div className="detail-section detail-section--first">
+                <h4 className="section-title">Venta #{selectedSaleSummary.id}</h4>
+                <p className="detail-description">
+                  Fecha: {formatDateTimeLabel(selectedSaleSummary.soldAt)}
+                </p>
+              </div>
+
+              {detailError ? <p className="form-error">{detailError}</p> : null}
+
+              {isDetailLoading ? (
+                <p className="detail-description">Cargando detalle de venta...</p>
+              ) : saleDetail ? (
+                <>
+                  <div className="detail-stats">
+                    <div className="stat-card">
+                      <span className="stat-label">Items</span>
+                      <span className="stat-value">{saleDetail.itemsCount}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => decreaseQuantity(item.product.id)}
-                        disabled={isSubmitting}
-                      >
-                        -
-                      </button>
-                      <span className="info-value">{item.quantity}</span>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => increaseQuantity(item.product.id)}
-                        disabled={isSubmitting || item.quantity >= item.product.stock}
-                      >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={() => removeFromCart(item.product.id)}
-                        disabled={isSubmitting}
-                      >
-                        Quitar
-                      </button>
+                    <div className="stat-card">
+                      <span className="stat-label">Total</span>
+                      <span className="stat-value stat-value--price">
+                        {formatCurrency(saleDetail.totalSale)}
+                      </span>
+                    </div>
+                    <div className="stat-card">
+                      <span className="stat-label">Utilidad</span>
+                      <span className="stat-value">{formatCurrency(saleDetail.profit)}</span>
+                    </div>
+                    <div className="stat-card">
+                      <span className="stat-label">Pago</span>
+                      <span className="stat-value">
+                        {formatPaymentMethod(saleDetail.paymentMethod)}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  <div className="detail-section">
+                    <h4 className="section-title">Items vendidos</h4>
+                    <div className="data-table-container">
+                      <table className="data-table">
+                        <thead className="table-header">
+                          <tr>
+                            <th className="table-cell table-cell--header">Producto</th>
+                            <th className="table-cell table-cell--header">Marca</th>
+                            <th className="table-cell table-cell--header table-cell--right">Cant.</th>
+                            <th className="table-cell table-cell--header table-cell--right">Precio</th>
+                          </tr>
+                        </thead>
+                        <tbody className="table-body">
+                          {saleDetail.items.length === 0 ? (
+                            <tr className="table-row">
+                              <td className="table-cell" colSpan={4}>
+                                Esta venta no tiene items.
+                              </td>
+                            </tr>
+                          ) : (
+                            saleDetail.items.map((item) => (
+                              <tr key={item.id} className="table-row">
+                                <td className="table-cell">{item.name}</td>
+                                <td className="table-cell">{item.brand || 'Sin marca'}</td>
+                                <td className="table-cell table-cell--right table-cell--number">
+                                  {item.quantity}
+                                </td>
+                                <td className="table-cell table-cell--right table-cell--number">
+                                  {formatCurrency(item.unitSalePrice)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </>
           )}
         </div>
 
         <div className="panel-footer">
-          <div style={{ width: '100%' }}>
-            <div className="info-row">
-              <span className="info-label">Items</span>
-              <span className="info-value">{cartItemsCount}</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Total</span>
-              <span className="info-value info-value--highlight">
-                {formatCurrency(cartTotal)}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                void handleConfirmSale();
-              }}
-              disabled={isSubmitting || cartItems.length === 0}
-              style={{ width: '100%', marginTop: '8px' }}
-            >
-              {isSubmitting ? 'Procesando venta...' : 'Confirmar venta'}
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={openEditModal}
+            disabled={!saleDetail || isSubmitting}
+          >
+            Editar venta
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger-outline"
+            onClick={() => {
+              void handleDeleteSale();
+            }}
+            disabled={!saleDetail || isSubmitting}
+          >
+            Eliminar venta
+          </button>
         </div>
       </aside>
+
+      {isEditModalOpen ? (
+        <div className="modal-overlay modal-overlay--visible" role="dialog" aria-modal="true">
+          <div className="modal modal--large finance-edit-modal">
+            <div className="modal-header">
+              <h3 className="modal-title">Editar venta</h3>
+              <button type="button" className="modal-close" onClick={closeEditModal}>
+                x
+              </button>
+            </div>
+
+            <div className="modal-content">
+              <div className="form-grid">
+                <div className="form-field">
+                  <label className="form-label" htmlFor="edit-sold-at">
+                    Fecha y hora
+                  </label>
+                  <input
+                    id="edit-sold-at"
+                    className="form-input"
+                    type="datetime-local"
+                    value={editSoldAt}
+                    onChange={(event) => setEditSoldAt(event.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="form-label" htmlFor="edit-payment-method">
+                    Metodo de pago
+                  </label>
+                  <select
+                    id="edit-payment-method"
+                    className="form-select"
+                    value={editPaymentMethod}
+                    onChange={(event) => setEditPaymentMethod(event.target.value as PaymentMethod)}
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="card">Tarjeta</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="detail-section">
+                <h4 className="section-title">Items</h4>
+                <div className="info-list">
+                  <div className="sales-edit-items-header">
+                    <span>Codigo</span>
+                    <span>Producto</span>
+                    <span>Marca</span>
+                    <span>Stock</span>
+                    <span>Precio</span>
+                    <span>Cantidad</span>
+                  </div>
+                  {editItems.map((item, index) => (
+                    <div key={item.productId} className="sales-edit-item-row">
+                      <div className="sales-edit-item-meta">
+                        <div className="sales-edit-item-field">
+                          <span className="info-value info-value--mono">{item.codebar}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{item.name}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{item.brand || 'Sin marca'}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{getEditableItemAvailableStock(item)}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{formatCurrency(item.unitSalePrice)}</span>
+                        </div>
+                      </div>
+                      <div className="sales-edit-item-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setEditItems((current) =>
+                              current.map((currentItem, currentIndex) =>
+                                currentIndex === index
+                                  ? {
+                                      ...currentItem,
+                                      quantity: Math.max(0, currentItem.quantity - 1),
+                                    }
+                                  : currentItem,
+                              ),
+                            );
+                          }}
+                        >
+                          -
+                        </button>
+                        <span className="info-value">{item.quantity}</span>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          disabled={item.quantity >= getEditableItemMaxQuantity(item)}
+                          onClick={() => {
+                            setEditItems((current) =>
+                              current.map((currentItem, currentIndex) =>
+                                currentIndex === index
+                                  ? {
+                                      ...currentItem,
+                                      quantity: Math.min(
+                                        getEditableItemMaxQuantity(currentItem),
+                                        currentItem.quantity + 1,
+                                      ),
+                                    }
+                                  : currentItem,
+                              ),
+                            );
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="detail-section">
+                <h4 className="section-title">Agregar producto</h4>
+                <div className="filters-bar">
+                  <div className="filters-group">
+                    <div className="filter-item">
+                      <label className="filter-label" htmlFor="edit-sale-search-product">
+                        Buscar producto
+                      </label>
+                      <input
+                        id="edit-sale-search-product"
+                        className="form-input"
+                        placeholder="Nombre o codigo..."
+                        value={editSearchInput}
+                        onChange={(event) => setEditSearchInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            void handleSearchProductsForEdit();
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="filters-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        void handleSearchProductsForEdit();
+                      }}
+                      disabled={isSearchingEditProducts}
+                    >
+                      Buscar
+                    </button>
+                  </div>
+                </div>
+
+                {editSearchError ? <p className="form-error">{editSearchError}</p> : null}
+
+                <div className="data-table-container">
+                  <table className="data-table">
+                    <thead className="table-header">
+                      <tr>
+                        <th className="table-cell table-cell--header">Producto</th>
+                        <th className="table-cell table-cell--header">Marca</th>
+                        <th className="table-cell table-cell--header">Codigo</th>
+                        <th className="table-cell table-cell--header table-cell--right">Stock</th>
+                        <th className="table-cell table-cell--header">Accion</th>
+                      </tr>
+                    </thead>
+                    <tbody className="table-body">
+                      {isSearchingEditProducts ? (
+                        <tr className="table-row">
+                          <td className="table-cell" colSpan={5}>
+                            Buscando productos...
+                          </td>
+                        </tr>
+                      ) : editSearchResults.length === 0 ? (
+                        <tr className="table-row">
+                          <td className="table-cell" colSpan={5}>
+                            No hay resultados.
+                          </td>
+                        </tr>
+                      ) : (
+                        editSearchResults.map((product) => {
+                          const existing = editItems.find(
+                            (item) => item.productId === product.id,
+                          );
+                          const availableStock = existing
+                            ? Math.max(
+                                0,
+                                existing.baseQuantity + product.stock - existing.quantity,
+                              )
+                            : Math.max(0, product.stock);
+                          const canAdd = availableStock > 0;
+
+                          return (
+                            <tr key={product.id} className="table-row">
+                              <td className="table-cell">{product.name}</td>
+                              <td className="table-cell">{product.brand}</td>
+                              <td className="table-cell table-cell--code">{product.codebar}</td>
+                              <td className="table-cell table-cell--right table-cell--number">
+                                {availableStock}
+                              </td>
+                              <td className="table-cell">
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  disabled={!canAdd}
+                                  onClick={() => {
+                                    setEditItems((current) => {
+                                      const currentExisting = current.find(
+                                        (item) => item.productId === product.id,
+                                      );
+
+                                      if (currentExisting) {
+                                        const maxForCurrent = Math.max(
+                                          0,
+                                          currentExisting.baseQuantity + product.stock,
+                                        );
+                                        if (currentExisting.quantity >= maxForCurrent) {
+                                          return current;
+                                        }
+
+                                        return current.map((item) =>
+                                          item.productId === product.id
+                                            ? {
+                                                ...item,
+                                                stock: product.stock,
+                                                quantity: Math.min(
+                                                  maxForCurrent,
+                                                  item.quantity + 1,
+                                                ),
+                                              }
+                                            : item,
+                                        );
+                                      }
+
+                                      if (product.stock <= 0) return current;
+
+                                      return [
+                                        ...current,
+                                        {
+                                          productId: product.id,
+                                          codebar: product.codebar,
+                                          name: product.name,
+                                          brand: product.brand,
+                                          stock: product.stock,
+                                          baseQuantity: 0,
+                                          unitSalePrice: product.salePrice,
+                                          quantity: 1,
+                                        },
+                                      ];
+                                    });
+                                  }}
+                                >
+                                  Agregar
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-ghost" onClick={closeEditModal}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  void handleSaveEdit();
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isCreateModalOpen ? (
+        <div className="modal-overlay modal-overlay--visible" role="dialog" aria-modal="true">
+          <div className="modal modal--large finance-edit-modal">
+            <div className="modal-header">
+              <h3 className="modal-title">Nueva venta</h3>
+              <button type="button" className="modal-close" onClick={closeCreateModal}>
+                x
+              </button>
+            </div>
+
+            <div className="modal-content">
+              <div className="form-grid">
+                <div className="form-field">
+                  <label className="form-label" htmlFor="create-sold-at">
+                    Fecha y hora
+                  </label>
+                  <input
+                    id="create-sold-at"
+                    className="form-input"
+                    type="datetime-local"
+                    value={createSoldAt}
+                    onChange={(event) => setCreateSoldAt(event.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="form-label" htmlFor="create-payment-method">
+                    Metodo de pago
+                  </label>
+                  <select
+                    id="create-payment-method"
+                    className="form-select"
+                    value={createPaymentMethod}
+                    onChange={(event) => setCreatePaymentMethod(event.target.value as PaymentMethod)}
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="card">Tarjeta</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="detail-section">
+                <h4 className="section-title">Items</h4>
+                <div className="info-list">
+                  <div className="sales-edit-items-header">
+                    <span>Codigo</span>
+                    <span>Producto</span>
+                    <span>Marca</span>
+                    <span>Stock</span>
+                    <span>Precio</span>
+                    <span>Cantidad</span>
+                  </div>
+                  {createItems.map((item, index) => (
+                    <div key={item.productId} className="sales-edit-item-row">
+                      <div className="sales-edit-item-meta">
+                        <div className="sales-edit-item-field">
+                          <span className="info-value info-value--mono">{item.codebar}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{item.name}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{item.brand || 'Sin marca'}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{getEditableItemAvailableStock(item)}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{formatCurrency(item.unitSalePrice)}</span>
+                        </div>
+                      </div>
+                      <div className="sales-edit-item-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setCreateItems((current) =>
+                              current.map((currentItem, currentIndex) =>
+                                currentIndex === index
+                                  ? {
+                                      ...currentItem,
+                                      quantity: Math.max(0, currentItem.quantity - 1),
+                                    }
+                                  : currentItem,
+                              ),
+                            );
+                          }}
+                        >
+                          -
+                        </button>
+                        <span className="info-value">{item.quantity}</span>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          disabled={item.quantity >= getEditableItemMaxQuantity(item)}
+                          onClick={() => {
+                            setCreateItems((current) =>
+                              current.map((currentItem, currentIndex) =>
+                                currentIndex === index
+                                  ? {
+                                      ...currentItem,
+                                      quantity: Math.min(
+                                        getEditableItemMaxQuantity(currentItem),
+                                        currentItem.quantity + 1,
+                                      ),
+                                    }
+                                  : currentItem,
+                              ),
+                            );
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="detail-section">
+                <h4 className="section-title">Agregar producto</h4>
+                <div className="filters-bar">
+                  <div className="filters-group">
+                    <div className="filter-item">
+                      <label className="filter-label" htmlFor="create-sale-search-product">
+                        Buscar producto
+                      </label>
+                      <input
+                        id="create-sale-search-product"
+                        className="form-input"
+                        placeholder="Nombre o codigo..."
+                        value={createSearchInput}
+                        onChange={(event) => setCreateSearchInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            void handleSearchProductsForCreate();
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="filters-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        void handleSearchProductsForCreate();
+                      }}
+                      disabled={isSearchingCreateProducts}
+                    >
+                      Buscar
+                    </button>
+                  </div>
+                </div>
+
+                {createSearchError ? <p className="form-error">{createSearchError}</p> : null}
+
+                <div className="data-table-container">
+                  <table className="data-table">
+                    <thead className="table-header">
+                      <tr>
+                        <th className="table-cell table-cell--header">Producto</th>
+                        <th className="table-cell table-cell--header">Marca</th>
+                        <th className="table-cell table-cell--header">Codigo</th>
+                        <th className="table-cell table-cell--header table-cell--right">Stock</th>
+                        <th className="table-cell table-cell--header">Accion</th>
+                      </tr>
+                    </thead>
+                    <tbody className="table-body">
+                      {isSearchingCreateProducts ? (
+                        <tr className="table-row">
+                          <td className="table-cell" colSpan={5}>
+                            Buscando productos...
+                          </td>
+                        </tr>
+                      ) : createSearchResults.length === 0 ? (
+                        <tr className="table-row">
+                          <td className="table-cell" colSpan={5}>
+                            No hay resultados.
+                          </td>
+                        </tr>
+                      ) : (
+                        createSearchResults.map((product) => {
+                          const existing = createItems.find(
+                            (item) => item.productId === product.id,
+                          );
+                          const availableStock = existing
+                            ? Math.max(0, product.stock - existing.quantity)
+                            : Math.max(0, product.stock);
+                          const canAdd = availableStock > 0;
+
+                          return (
+                            <tr key={product.id} className="table-row">
+                              <td className="table-cell">{product.name}</td>
+                              <td className="table-cell">{product.brand}</td>
+                              <td className="table-cell table-cell--code">{product.codebar}</td>
+                              <td className="table-cell table-cell--right table-cell--number">
+                                {availableStock}
+                              </td>
+                              <td className="table-cell">
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  disabled={!canAdd}
+                                  onClick={() => {
+                                    setCreateItems((current) => {
+                                      const currentExisting = current.find(
+                                        (item) => item.productId === product.id,
+                                      );
+
+                                      if (currentExisting) {
+                                        const maxForCurrent = Math.max(0, product.stock);
+                                        if (currentExisting.quantity >= maxForCurrent) {
+                                          return current;
+                                        }
+
+                                        return current.map((item) =>
+                                          item.productId === product.id
+                                            ? {
+                                                ...item,
+                                                stock: product.stock,
+                                                quantity: Math.min(
+                                                  maxForCurrent,
+                                                  item.quantity + 1,
+                                                ),
+                                              }
+                                            : item,
+                                        );
+                                      }
+
+                                      if (product.stock <= 0) return current;
+
+                                      return [
+                                        ...current,
+                                        {
+                                          productId: product.id,
+                                          codebar: product.codebar,
+                                          name: product.name,
+                                          brand: product.brand,
+                                          stock: product.stock,
+                                          baseQuantity: 0,
+                                          unitSalePrice: product.salePrice,
+                                          quantity: 1,
+                                        },
+                                      ];
+                                    });
+                                  }}
+                                >
+                                  Agregar
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-ghost" onClick={closeCreateModal}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  void handleSaveCreate();
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Guardando...' : 'Registrar venta'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 };

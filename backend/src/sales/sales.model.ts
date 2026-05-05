@@ -4,6 +4,9 @@ import { pool } from '../db/mysql.js';
 import type { PaginatedResult, PaginationParams } from '../utils/pagination.utils.js';
 import type { CreateSaleInput, UpdateSaleInput } from './sales.schema.js';
 import type {
+  CashboxBalances,
+  CashboxRow,
+  PaymentMethod,
   Sale,
   SaleItem,
   SaleItemRow,
@@ -29,6 +32,11 @@ function toMySqlDateTime(value: string): string {
   return parsed.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+function toIsoDateTimeOrNow(value: Date | string | null | undefined): string {
+  if (!value) return new Date().toISOString();
+  return new Date(value).toISOString();
+}
+
 function mapSaleItemRow(row: SaleItemRow): SaleItem {
   return {
     id: row.id,
@@ -50,6 +58,7 @@ function mapSaleRow(row: SaleRow, items: SaleItem[]): Sale {
   return {
     id: row.id,
     soldAt: toIsoDateTime(row.sold_at),
+    paymentMethod: row.payment_method,
     itemsCount: row.items_count,
     totalSale: row.total_sale,
     totalCost: row.total_cost,
@@ -62,6 +71,7 @@ function mapSaleSummaryRow(row: SaleRow): SaleSummary {
   return {
     id: row.id,
     soldAt: toIsoDateTime(row.sold_at),
+    paymentMethod: row.payment_method,
     itemsCount: row.items_count,
     totalSale: row.total_sale,
     totalCost: row.total_cost,
@@ -70,6 +80,122 @@ function mapSaleSummaryRow(row: SaleRow): SaleSummary {
 }
 
 export class SalesModel {
+  private static normalizePaymentMethod(
+    value: PaymentMethod | undefined,
+  ): PaymentMethod {
+    return value === 'card' ? 'card' : 'cash';
+  }
+
+  private static async ensureCashboxRowWithConnection(
+    connection: PoolConnection,
+  ): Promise<void> {
+    await connection.query(
+      `
+        INSERT INTO cashbox_balances (id, cash_balance, card_balance)
+        VALUES (1, 0, 0)
+        ON DUPLICATE KEY UPDATE id = id
+      `,
+    );
+  }
+
+  private static async applyCashboxDelta(
+    connection: PoolConnection,
+    paymentMethod: PaymentMethod,
+    amountDelta: number,
+  ): Promise<void> {
+    await this.ensureCashboxRowWithConnection(connection);
+
+    if (paymentMethod === 'card') {
+      await connection.query<ResultSetHeader>(
+        `
+          UPDATE cashbox_balances
+          SET card_balance = card_balance + ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = 1
+        `,
+        [amountDelta],
+      );
+      return;
+    }
+
+    await connection.query<ResultSetHeader>(
+      `
+        UPDATE cashbox_balances
+        SET cash_balance = cash_balance + ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+      `,
+      [amountDelta],
+    );
+  }
+
+  static async getCashboxBalances(): Promise<CashboxBalances> {
+    const connection = await pool.getConnection();
+
+    try {
+      await this.ensureCashboxRowWithConnection(connection);
+
+      const [rows] = await connection.query<CashboxRow[]>(
+        `
+          SELECT id, cash_balance, card_balance, updated_at
+          FROM cashbox_balances
+          WHERE id = 1
+        `,
+      );
+
+      const row = rows[0];
+      if (!row) {
+        return {
+          cash: 0,
+          card: 0,
+          total: 0,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      return {
+        cash: row.cash_balance,
+        card: row.card_balance,
+        total: row.cash_balance + row.card_balance,
+        updatedAt: toIsoDateTimeOrNow(row.updated_at),
+      };
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async setCashboxBalances(
+    cash: number,
+    card: number,
+  ): Promise<CashboxBalances> {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+      await this.ensureCashboxRowWithConnection(connection);
+
+      await connection.query<ResultSetHeader>(
+        `
+          UPDATE cashbox_balances
+          SET cash_balance = ?, card_balance = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = 1
+        `,
+        [cash, card],
+      );
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    return this.getCashboxBalances();
+  }
+
+  static async resetCashboxBalances(): Promise<CashboxBalances> {
+    return this.setCashboxBalances(0, 0);
+  }
+
   static async getSales(
     pagination: PaginationParams,
     filters: {
@@ -109,6 +235,7 @@ export class SalesModel {
         SELECT
           id,
           sold_at,
+          payment_method,
           items_count,
           total_sale,
           total_cost,
@@ -207,6 +334,7 @@ export class SalesModel {
         SELECT
           id,
           sold_at,
+          payment_method,
           items_count,
           total_sale,
           total_cost,
@@ -248,7 +376,7 @@ export class SalesModel {
   }
 
   static async createSale(data: CreateSaleInput): Promise<Sale> {
-    return this.createSaleWithOptionalDate(data, undefined);
+    return this.createSaleWithOptionalDate(data, data.soldAt);
   }
 
   static async updateSale(saleId: number, data: UpdateSaleInput): Promise<Sale> {
@@ -276,6 +404,7 @@ export class SalesModel {
           SELECT
             id,
             sold_at,
+            payment_method,
             items_count,
             total_sale,
             total_cost,
@@ -290,6 +419,12 @@ export class SalesModel {
       if (saleRows.length === 0) {
         throw { message: 'Venta no encontrada.', statusCode: 404 };
       }
+      const currentSale = saleRows[0]!;
+      const previousPaymentMethod = this.normalizePaymentMethod(currentSale.payment_method);
+      const nextPaymentMethod =
+        data.paymentMethod === undefined
+          ? previousPaymentMethod
+          : this.normalizePaymentMethod(data.paymentMethod);
 
       const [currentItemRows] = await connection.query<SaleItemRow[]>(
         `
@@ -483,21 +618,24 @@ export class SalesModel {
         await connection.query<ResultSetHeader>(
           `
             UPDATE sales
-            SET sold_at = ?, items_count = ?, total_sale = ?, total_cost = ?, profit = ?
+            SET sold_at = ?, payment_method = ?, items_count = ?, total_sale = ?, total_cost = ?, profit = ?
             WHERE id = ?
           `,
-          [soldAtMySql, itemsCount, totalSale, totalCost, profit, saleId],
+          [soldAtMySql, nextPaymentMethod, itemsCount, totalSale, totalCost, profit, saleId],
         );
       } else {
         await connection.query<ResultSetHeader>(
           `
             UPDATE sales
-            SET items_count = ?, total_sale = ?, total_cost = ?, profit = ?
+            SET payment_method = ?, items_count = ?, total_sale = ?, total_cost = ?, profit = ?
             WHERE id = ?
           `,
-          [itemsCount, totalSale, totalCost, profit, saleId],
+          [nextPaymentMethod, itemsCount, totalSale, totalCost, profit, saleId],
         );
       }
+
+      await this.applyCashboxDelta(connection, previousPaymentMethod, -currentSale.total_sale);
+      await this.applyCashboxDelta(connection, nextPaymentMethod, totalSale);
 
       await connection.commit();
 
@@ -529,6 +667,7 @@ export class SalesModel {
           SELECT
             id,
             sold_at,
+            payment_method,
             items_count,
             total_sale,
             total_cost,
@@ -543,6 +682,8 @@ export class SalesModel {
       if (saleRows.length === 0) {
         throw { message: 'Venta no encontrada.', statusCode: 404 };
       }
+      const saleRow = saleRows[0]!;
+      const salePaymentMethod = this.normalizePaymentMethod(saleRow.payment_method);
 
       const [itemRows] = await connection.query<SaleItemRow[]>(
         `
@@ -629,6 +770,8 @@ export class SalesModel {
         [saleId],
       );
 
+      await this.applyCashboxDelta(connection, salePaymentMethod, -saleRow.total_sale);
+
       await connection.commit();
     } catch (error) {
       await connection.rollback();
@@ -642,6 +785,7 @@ export class SalesModel {
     data: CreateSaleInput,
     soldAt?: string,
   ): Promise<Sale> {
+    const paymentMethod = this.normalizePaymentMethod(data.paymentMethod);
     const normalizedByProductId = new Map<number, number>();
     data.items.forEach((item) => {
       const current = normalizedByProductId.get(item.productId) ?? 0;
@@ -746,10 +890,17 @@ export class SalesModel {
 
       const [saleResult] = await connection.query<ResultSetHeader>(
         `
-          INSERT INTO sales (sold_at, items_count, total_sale, total_cost, profit)
-          VALUES (COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?, ?)
+          INSERT INTO sales (sold_at, payment_method, items_count, total_sale, total_cost, profit)
+          VALUES (COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?, ?, ?)
         `,
-        [soldAt ? toMySqlDateTime(soldAt) : null, itemsCount, totalSale, totalCost, profit],
+        [
+          soldAt ? toMySqlDateTime(soldAt) : null,
+          paymentMethod,
+          itemsCount,
+          totalSale,
+          totalCost,
+          profit,
+        ],
       );
 
       const saleId = saleResult.insertId;
@@ -794,6 +945,8 @@ export class SalesModel {
         );
       }
 
+      await this.applyCashboxDelta(connection, paymentMethod, totalSale);
+
       await connection.commit();
 
       const sale = await this.getSaleByIdWithConnection(connection, saleId);
@@ -822,6 +975,7 @@ export class SalesModel {
         SELECT
           id,
           sold_at,
+          payment_method,
           items_count,
           total_sale,
           total_cost,

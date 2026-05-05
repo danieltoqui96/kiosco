@@ -177,6 +177,71 @@ body {
   padding: var(--space-md) 0;
 }
 
+.sidebar-cashbox {
+  margin: var(--space-md);
+  padding: var(--space-md);
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+}
+
+.sidebar-cashbox-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.sidebar-cashbox-title {
+  font-size: 0.75rem;
+  color: var(--color-gray-300);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-cashbox-settings {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-gray-200);
+  cursor: pointer;
+}
+
+.sidebar-cashbox-settings:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.sidebar-cashbox-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: 0.85rem;
+  color: var(--color-gray-200);
+  padding: 3px 0;
+}
+
+.sidebar-cashbox-row strong {
+  color: #fff;
+}
+
+.sidebar-cashbox-row--total {
+  margin-top: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.sidebar-cashbox-hint {
+  font-size: 0.8rem;
+  color: var(--color-gray-300);
+}
+
+.sidebar-cashbox-hint--error {
+  color: #fca5a5;
+}
+
 .nav-item {
   display: flex;
   align-items: center;

@@ -1,5 +1,9 @@
 import type { Request, Response } from 'express';
-import { createSaleSchema, updateSaleSchema } from './sales.schema.js';
+import {
+  createSaleSchema,
+  updateCashboxSchema,
+  updateSaleSchema,
+} from './sales.schema.js';
 import { SalesModel } from './sales.model.js';
 import {
   getErrorData,
@@ -17,6 +21,39 @@ function isValidDateString(value: string): boolean {
 }
 
 export class SalesController {
+  static async getCashboxBalances(req: Request, res: Response) {
+    try {
+      const cashbox = await SalesModel.getCashboxBalances();
+      return res.success(cashbox, 'Caja obtenida con exito', 200);
+    } catch (error) {
+      return res.error('Error al obtener caja', 500, getErrorData(error));
+    }
+  }
+
+  static async updateCashboxBalances(req: Request, res: Response) {
+    try {
+      const parsed = updateCashboxSchema.safeParse(req.body);
+      if (!parsed.success) return res.error('Datos invalidos', 400, parsed.error.issues);
+
+      const cashbox = await SalesModel.setCashboxBalances(
+        parsed.data.cash,
+        parsed.data.card,
+      );
+      return res.success(cashbox, 'Caja actualizada correctamente', 200);
+    } catch (error) {
+      return res.error('Error al actualizar caja', 500, getErrorData(error));
+    }
+  }
+
+  static async resetCashboxBalances(req: Request, res: Response) {
+    try {
+      const cashbox = await SalesModel.resetCashboxBalances();
+      return res.success(cashbox, 'Caja reiniciada correctamente', 200);
+    } catch (error) {
+      return res.error('Error al reiniciar caja', 500, getErrorData(error));
+    }
+  }
+
   static async getSales(req: Request, res: Response) {
     try {
       const pagination = getPaginationParams(req.query.page, req.query.limit);

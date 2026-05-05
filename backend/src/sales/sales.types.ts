@@ -1,5 +1,7 @@
 import type { RowDataPacket } from 'mysql2';
 
+export type PaymentMethod = 'cash' | 'card';
+
 export interface SaleProductRow extends RowDataPacket {
   id: number;
   codebar: string;
@@ -15,6 +17,7 @@ export interface SaleProductRow extends RowDataPacket {
 export interface SaleRow extends RowDataPacket {
   id: number;
   sold_at: Date | string;
+  payment_method: PaymentMethod;
   items_count: number;
   total_sale: number;
   total_cost: number;
@@ -64,6 +67,7 @@ export interface SaleItem {
 export interface Sale {
   id: number;
   soldAt: string;
+  paymentMethod: PaymentMethod;
   itemsCount: number;
   totalSale: number;
   totalCost: number;
@@ -74,8 +78,23 @@ export interface Sale {
 export interface SaleSummary {
   id: number;
   soldAt: string;
+  paymentMethod: PaymentMethod;
   itemsCount: number;
   totalSale: number;
   totalCost: number;
   profit: number;
+}
+
+export interface CashboxRow extends RowDataPacket {
+  id: number;
+  cash_balance: number;
+  card_balance: number;
+  updated_at: Date | string;
+}
+
+export interface CashboxBalances {
+  cash: number;
+  card: number;
+  total: number;
+  updatedAt: string;
 }

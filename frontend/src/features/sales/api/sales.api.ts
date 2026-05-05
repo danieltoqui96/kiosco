@@ -1,5 +1,6 @@
 import { requestJson } from '../../products/api/http';
 import type {
+  CashboxBalances,
   CreateSalePayload,
   Sale,
   SalesQuery,
@@ -55,6 +56,23 @@ export const salesApi = {
   deleteSale(id: number) {
     return requestJson<{ id: number }>(`/sales/${id}`, {
       method: 'DELETE',
+    });
+  },
+
+  getCashbox() {
+    return requestJson<CashboxBalances>('/sales/cashbox');
+  },
+
+  updateCashbox(payload: { cash: number; card: number }) {
+    return requestJson<CashboxBalances>('/sales/cashbox', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  resetCashbox() {
+    return requestJson<CashboxBalances>('/sales/cashbox/reset', {
+      method: 'POST',
     });
   },
 };

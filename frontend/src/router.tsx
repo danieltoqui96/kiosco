@@ -46,7 +46,7 @@ const PRODUCT_QUERY_KEYS = new Set([
 ]);
 
 const CATALOG_QUERY_KEYS = new Set(['page', 'q']);
-const SALES_QUERY_KEYS = new Set(['page', 'q']);
+const SALES_QUERY_KEYS = new Set(['from', 'to', 'saleId']);
 const FINANCE_QUERY_KEYS = new Set(['from', 'to', 'saleId']);
 
 function parsePage(rawValue: unknown): number {
@@ -143,8 +143,9 @@ function sanitizeSearchForSection(
 
   if (section === 'ventas') {
     return {
-      page: parsePage(search.page),
-      q: search.q,
+      from: search.from,
+      to: search.to,
+      saleId: search.saleId,
     };
   }
 
@@ -157,9 +158,10 @@ function sanitizeSearchForSection(
 
 function getDefaultSearchState(section: SectionPath): RouterSearchState {
   if (section === 'productos') return defaultProductsSearch;
-  if (section === 'categorias' || section === 'marcas' || section === 'ventas') {
+  if (section === 'categorias' || section === 'marcas') {
     return { page: 1 };
   }
+  if (section === 'ventas') return {};
   return {};
 }
 
@@ -216,8 +218,9 @@ function isQueryCanonical(
           }
         : section === 'ventas'
           ? {
-              page: String(parsePage(search.page)),
-              q: search.q,
+              from: search.from,
+              to: search.to,
+              saleId: search.saleId,
             }
           : {
               from: search.from,
@@ -381,11 +384,10 @@ function SectionView() {
       if (sectionPath !== 'ventas') return;
 
       updateSearch({
-        page:
-          next.page === undefined
-            ? parsePage(currentSearch.page)
-            : Math.max(1, Math.floor(next.page)),
-        q: next.q === undefined ? currentSearch.q : parseOptionalText(next.q),
+        from: next.from === undefined ? currentSearch.from : parseOptionalText(next.from),
+        to: next.to === undefined ? currentSearch.to : parseOptionalText(next.to),
+        saleId:
+          next.saleId === undefined ? currentSearch.saleId : parseOptionalText(next.saleId),
       });
     },
     [currentSearch, sectionPath, updateSearch],
@@ -420,8 +422,9 @@ function SectionView() {
   };
 
   const salesRouteState: SalesRouteState = {
-    page: parsePage(currentSearch.page),
-    q: currentSearch.q ?? '',
+    from: currentSearch.from ?? '',
+    to: currentSearch.to ?? '',
+    saleId: currentSearch.saleId ?? '',
   };
 
   const financeRouteState: FinanceRouteState = {

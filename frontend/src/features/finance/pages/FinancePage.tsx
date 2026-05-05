@@ -3,7 +3,12 @@ import type { FinanceRouteState } from '../../../components/layout/MainLayout';
 import '../../products/styles/products.css';
 import { formatCurrency } from '../../products/presentation.utils';
 import { salesApi } from '../../sales/api/sales.api';
-import type { Sale, SaleProduct, SaleSummary } from '../../sales/types';
+import type {
+  PaymentMethod,
+  Sale,
+  SaleProduct,
+  SaleSummary,
+} from '../../sales/types';
 
 interface FinancePageProps {
   routeState: FinanceRouteState;
@@ -42,6 +47,10 @@ function fromDatetimeLocal(value: string): string | undefined {
   return date.toISOString();
 }
 
+function formatPaymentMethod(method: PaymentMethod): string {
+  return method === 'card' ? 'Tarjeta' : 'Efectivo';
+}
+
 function getEditableItemMaxQuantity(item: EditableSaleItem): number {
   return Math.max(0, item.baseQuantity + item.stock);
 }
@@ -74,6 +83,7 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
   const [editSearchResults, setEditSearchResults] = useState<SaleProduct[]>([]);
   const [isSearchingEditProducts, setIsSearchingEditProducts] = useState(false);
   const [editSearchError, setEditSearchError] = useState<string | null>(null);
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>('cash');
 
   const syncFinanceRoute = useCallback(
     (next: Partial<FinanceRouteState>) => {
@@ -186,6 +196,7 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
     if (!saleDetail) return;
 
     setEditSoldAt(toDatetimeLocal(saleDetail.soldAt));
+    setEditPaymentMethod(saleDetail.paymentMethod);
     setEditItems(
       saleDetail.items.map((item) => ({
         productId: item.productId,
@@ -212,6 +223,7 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
     setEditSearchInput('');
     setEditSearchResults([]);
     setEditSearchError(null);
+    setEditPaymentMethod('cash');
   };
 
   const handleSearchProductsForEdit = async () => {
@@ -253,6 +265,7 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
     const saleId = saleDetail.id;
     const currentSoldAt = editSoldAt;
     const currentItems = normalizedItems;
+    const currentPaymentMethod = editPaymentMethod;
     setIsSubmitting(true);
     setDetailError(null);
     setActionMessage(null);
@@ -263,6 +276,7 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
       const updated = await salesApi.updateSale(saleId, {
         items: currentItems,
         soldAt: soldAtIso,
+        paymentMethod: currentPaymentMethod,
       });
       setActionMessage(`Venta #${updated.id} actualizada correctamente.`);
       window.dispatchEvent(new Event('inventory:changed'));
@@ -505,6 +519,12 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                       <span className="stat-label">Utilidad</span>
                       <span className="stat-value">{formatCurrency(saleDetail.profit)}</span>
                     </div>
+                    <div className="stat-card">
+                      <span className="stat-label">Pago</span>
+                      <span className="stat-value">
+                        {formatPaymentMethod(saleDetail.paymentMethod)}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="detail-section">
@@ -595,6 +615,20 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                     value={editSoldAt}
                     onChange={(event) => setEditSoldAt(event.target.value)}
                   />
+                </div>
+                <div className="form-field">
+                  <label className="form-label" htmlFor="edit-payment-method">
+                    Metodo de pago
+                  </label>
+                  <select
+                    id="edit-payment-method"
+                    className="form-select"
+                    value={editPaymentMethod}
+                    onChange={(event) => setEditPaymentMethod(event.target.value as PaymentMethod)}
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="card">Tarjeta</option>
+                  </select>
                 </div>
               </div>
 

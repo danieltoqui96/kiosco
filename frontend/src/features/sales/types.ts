@@ -1,5 +1,7 @@
 import type { PaginatedResult } from '../products/types';
 
+export type PaymentMethod = 'cash' | 'card';
+
 export interface SaleProduct {
   id: number;
   codebar: string;
@@ -28,6 +30,7 @@ export interface SaleItem {
 export interface Sale {
   id: number;
   soldAt: string;
+  paymentMethod: PaymentMethod;
   itemsCount: number;
   totalSale: number;
   totalCost: number;
@@ -38,6 +41,7 @@ export interface Sale {
 export interface SaleSummary {
   id: number;
   soldAt: string;
+  paymentMethod: PaymentMethod;
   itemsCount: number;
   totalSale: number;
   totalCost: number;
@@ -49,6 +53,8 @@ export interface CreateSalePayload {
     productId: number;
     quantity: number;
   }>;
+  paymentMethod?: PaymentMethod;
+  soldAt?: string;
 }
 
 export interface SalesProductsQuery {
@@ -70,6 +76,14 @@ export interface UpdateSalePayload {
     quantity: number;
   }>;
   soldAt?: string;
+  paymentMethod?: PaymentMethod;
+}
+
+export interface CashboxBalances {
+  cash: number;
+  card: number;
+  total: number;
+  updatedAt: string;
 }
 
 export type SalesProductsResult = PaginatedResult<SaleProduct>;

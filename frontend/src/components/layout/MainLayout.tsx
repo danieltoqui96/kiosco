@@ -20,8 +20,9 @@ export interface CatalogRouteState {
 }
 
 export interface SalesRouteState {
-  page: number;
-  q: string;
+  from: string;
+  to: string;
+  saleId: string;
 }
 
 export interface FinanceRouteState {
