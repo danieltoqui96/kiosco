@@ -28,6 +28,7 @@ function mapSaleItemRow(row: SaleItemRow): SaleItem {
     productId: row.product_id,
     codebar: row.product_codebar,
     name: row.product_name,
+    brand: row.product_brand ?? '',
     quantity: row.quantity,
     unitSalePrice: row.unit_sale_price,
     unitPurchasePrice: row.unit_purchase_price,
@@ -213,19 +214,22 @@ export class SalesModel {
     const [itemRows] = await pool.query<SaleItemRow[]>(
       `
         SELECT
-          id,
-          sale_id,
-          product_id,
-          product_codebar,
-          product_name,
-          quantity,
-          unit_sale_price,
-          unit_purchase_price,
-          line_sale_total,
-          line_cost_total
-        FROM sale_items
-        WHERE sale_id = ?
-        ORDER BY id ASC
+          si.id,
+          si.sale_id,
+          si.product_id,
+          si.product_codebar,
+          si.product_name,
+          b.name AS product_brand,
+          si.quantity,
+          si.unit_sale_price,
+          si.unit_purchase_price,
+          si.line_sale_total,
+          si.line_cost_total
+        FROM sale_items si
+        LEFT JOIN products p ON p.id = si.product_id
+        LEFT JOIN brands b ON b.id = p.brand_id
+        WHERE si.sale_id = ?
+        ORDER BY si.id ASC
       `,
       [saleId],
     );
@@ -823,19 +827,22 @@ export class SalesModel {
     const [itemRows] = await connection.query<SaleItemRow[]>(
       `
         SELECT
-          id,
-          sale_id,
-          product_id,
-          product_codebar,
-          product_name,
-          quantity,
-          unit_sale_price,
-          unit_purchase_price,
-          line_sale_total,
-          line_cost_total
-        FROM sale_items
-        WHERE sale_id = ?
-        ORDER BY id ASC
+          si.id,
+          si.sale_id,
+          si.product_id,
+          si.product_codebar,
+          si.product_name,
+          b.name AS product_brand,
+          si.quantity,
+          si.unit_sale_price,
+          si.unit_purchase_price,
+          si.line_sale_total,
+          si.line_cost_total
+        FROM sale_items si
+        LEFT JOIN products p ON p.id = si.product_id
+        LEFT JOIN brands b ON b.id = p.brand_id
+        WHERE si.sale_id = ?
+        ORDER BY si.id ASC
       `,
       [saleId],
     );

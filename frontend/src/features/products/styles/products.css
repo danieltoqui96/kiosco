@@ -125,3 +125,59 @@
   border-top: none;
   padding-top: 0;
 }
+
+.sales-edit-item-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.4fr) minmax(120px, 1fr) minmax(110px, 0.8fr) 130px;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.sales-edit-item-row:last-child {
+  border-bottom: none;
+}
+
+.sales-edit-item-meta {
+  display: contents;
+}
+
+.sales-edit-items-header {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.4fr) minmax(120px, 1fr) minmax(110px, 0.8fr) 130px;
+  gap: var(--space-md);
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sales-edit-item-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sales-edit-item-field .info-value {
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sales-edit-item-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.finance-edit-modal {
+  max-width: 860px;
+}

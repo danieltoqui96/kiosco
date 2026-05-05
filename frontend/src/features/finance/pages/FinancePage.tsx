@@ -3,7 +3,7 @@ import type { FinanceRouteState } from '../../../components/layout/MainLayout';
 import '../../products/styles/products.css';
 import { formatCurrency } from '../../products/presentation.utils';
 import { salesApi } from '../../sales/api/sales.api';
-import type { Sale, SaleSummary } from '../../sales/types';
+import type { Sale, SaleProduct, SaleSummary } from '../../sales/types';
 
 interface FinancePageProps {
   routeState: FinanceRouteState;
@@ -14,6 +14,8 @@ interface EditableSaleItem {
   productId: number;
   codebar: string;
   name: string;
+  brand: string;
+  unitSalePrice: number;
   quantity: number;
 }
 
@@ -58,6 +60,10 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editSoldAt, setEditSoldAt] = useState('');
   const [editItems, setEditItems] = useState<EditableSaleItem[]>([]);
+  const [editSearchInput, setEditSearchInput] = useState('');
+  const [editSearchResults, setEditSearchResults] = useState<SaleProduct[]>([]);
+  const [isSearchingEditProducts, setIsSearchingEditProducts] = useState(false);
+  const [editSearchError, setEditSearchError] = useState<string | null>(null);
 
   const syncFinanceRoute = useCallback(
     (next: Partial<FinanceRouteState>) => {
@@ -174,9 +180,14 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
         productId: item.productId,
         codebar: item.codebar,
         name: item.name,
+        brand: item.brand,
+        unitSalePrice: item.unitSalePrice,
         quantity: item.quantity,
       })),
     );
+    setEditSearchInput('');
+    setEditSearchResults([]);
+    setEditSearchError(null);
     setIsEditModalOpen(true);
     setActionMessage(null);
   };
@@ -185,6 +196,30 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
     setIsEditModalOpen(false);
     setEditSoldAt('');
     setEditItems([]);
+    setEditSearchInput('');
+    setEditSearchResults([]);
+    setEditSearchError(null);
+  };
+
+  const handleSearchProductsForEdit = async () => {
+    setIsSearchingEditProducts(true);
+    setEditSearchError(null);
+
+    try {
+      const response = await salesApi.getProducts({
+        page: 1,
+        limit: 10,
+        search: editSearchInput.trim() || undefined,
+      });
+      setEditSearchResults(response.items);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudieron buscar productos.';
+      setEditSearchError(message);
+      setEditSearchResults([]);
+    } finally {
+      setIsSearchingEditProducts(false);
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -461,31 +496,29 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                       <table className="data-table">
                         <thead className="table-header">
                           <tr>
-                            <th className="table-cell table-cell--header">ID</th>
-                            <th className="table-cell table-cell--header">Codigo</th>
                             <th className="table-cell table-cell--header">Producto</th>
+                            <th className="table-cell table-cell--header">Marca</th>
                             <th className="table-cell table-cell--header table-cell--right">Cant.</th>
-                            <th className="table-cell table-cell--header table-cell--right">Total</th>
+                            <th className="table-cell table-cell--header table-cell--right">Precio</th>
                           </tr>
                         </thead>
                         <tbody className="table-body">
                           {saleDetail.items.length === 0 ? (
                             <tr className="table-row">
-                              <td className="table-cell" colSpan={5}>
+                              <td className="table-cell" colSpan={4}>
                                 Esta venta no tiene items.
                               </td>
                             </tr>
                           ) : (
                             saleDetail.items.map((item) => (
                               <tr key={item.id} className="table-row">
-                                <td className="table-cell table-cell--number">{item.productId}</td>
-                                <td className="table-cell table-cell--code">{item.codebar}</td>
                                 <td className="table-cell">{item.name}</td>
+                                <td className="table-cell">{item.brand || 'Sin marca'}</td>
                                 <td className="table-cell table-cell--right table-cell--number">
                                   {item.quantity}
                                 </td>
                                 <td className="table-cell table-cell--right table-cell--number">
-                                  {formatCurrency(item.lineSaleTotal)}
+                                  {formatCurrency(item.unitSalePrice)}
                                 </td>
                               </tr>
                             ))
@@ -524,7 +557,7 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
 
       {isEditModalOpen ? (
         <div className="modal-overlay modal-overlay--visible" role="dialog" aria-modal="true">
-          <div className="modal modal--large">
+          <div className="modal modal--large finance-edit-modal">
             <div className="modal-header">
               <h3 className="modal-title">Editar venta</h3>
               <button type="button" className="modal-close" onClick={closeEditModal}>
@@ -551,13 +584,30 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
               <div className="detail-section">
                 <h4 className="section-title">Items</h4>
                 <div className="info-list">
+                  <div className="sales-edit-items-header">
+                    <span>Codigo</span>
+                    <span>Producto</span>
+                    <span>Marca</span>
+                    <span>Precio</span>
+                    <span>Cantidad</span>
+                  </div>
                   {editItems.map((item, index) => (
-                    <div key={item.productId} className="info-row">
-                      <div>
-                        <div className="info-value">{item.name}</div>
-                        <div className="info-label">{item.codebar}</div>
+                    <div key={item.productId} className="sales-edit-item-row">
+                      <div className="sales-edit-item-meta">
+                        <div className="sales-edit-item-field">
+                          <span className="info-value info-value--mono">{item.codebar}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{item.name}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{item.brand || 'Sin marca'}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{formatCurrency(item.unitSalePrice)}</span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div className="sales-edit-item-actions">
                         <button
                           type="button"
                           className="btn btn-ghost"
@@ -598,6 +648,120 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="detail-section">
+                <h4 className="section-title">Agregar producto</h4>
+                <div className="filters-bar">
+                  <div className="filters-group">
+                    <div className="filter-item">
+                      <label className="filter-label" htmlFor="edit-sale-search-product">
+                        Buscar producto
+                      </label>
+                      <input
+                        id="edit-sale-search-product"
+                        className="form-input"
+                        placeholder="Nombre o codigo..."
+                        value={editSearchInput}
+                        onChange={(event) => setEditSearchInput(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            void handleSearchProductsForEdit();
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="filters-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        void handleSearchProductsForEdit();
+                      }}
+                      disabled={isSearchingEditProducts}
+                    >
+                      Buscar
+                    </button>
+                  </div>
+                </div>
+
+                {editSearchError ? <p className="form-error">{editSearchError}</p> : null}
+
+                <div className="data-table-container">
+                  <table className="data-table">
+                    <thead className="table-header">
+                      <tr>
+                        <th className="table-cell table-cell--header">Producto</th>
+                        <th className="table-cell table-cell--header">Marca</th>
+                        <th className="table-cell table-cell--header">Codigo</th>
+                        <th className="table-cell table-cell--header table-cell--right">Stock</th>
+                        <th className="table-cell table-cell--header">Accion</th>
+                      </tr>
+                    </thead>
+                    <tbody className="table-body">
+                      {isSearchingEditProducts ? (
+                        <tr className="table-row">
+                          <td className="table-cell" colSpan={5}>
+                            Buscando productos...
+                          </td>
+                        </tr>
+                      ) : editSearchResults.length === 0 ? (
+                        <tr className="table-row">
+                          <td className="table-cell" colSpan={5}>
+                            No hay resultados.
+                          </td>
+                        </tr>
+                      ) : (
+                        editSearchResults.map((product) => (
+                          <tr key={product.id} className="table-row">
+                            <td className="table-cell">{product.name}</td>
+                            <td className="table-cell">{product.brand}</td>
+                            <td className="table-cell table-cell--code">{product.codebar}</td>
+                            <td className="table-cell table-cell--right table-cell--number">
+                              {product.stock}
+                            </td>
+                            <td className="table-cell">
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => {
+                                  setEditItems((current) => {
+                                    const existing = current.find(
+                                      (item) => item.productId === product.id,
+                                    );
+                                    if (existing) {
+                                      return current.map((item) =>
+                                        item.productId === product.id
+                                          ? { ...item, quantity: item.quantity + 1 }
+                                          : item,
+                                      );
+                                    }
+
+                                    return [
+                                      ...current,
+                                      {
+                                        productId: product.id,
+                                        codebar: product.codebar,
+                                        name: product.name,
+                                        brand: product.brand,
+                                        unitSalePrice: product.salePrice,
+                                        quantity: 1,
+                                      },
+                                    ];
+                                  });
+                                }}
+                              >
+                                Agregar
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

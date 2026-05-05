@@ -16,6 +16,7 @@ export interface SaleItem {
   productId: number;
   codebar: string;
   name: string;
+  brand: string;
   quantity: number;
   unitSalePrice: number;
   unitPurchasePrice: number;
