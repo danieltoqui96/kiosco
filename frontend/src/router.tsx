@@ -29,7 +29,7 @@ interface RouterSearchState {
   codebar?: string;
   from?: string;
   to?: string;
-  day?: string;
+  saleId?: string;
 }
 
 const defaultProductsSearch: RouterSearchState = {
@@ -47,7 +47,7 @@ const PRODUCT_QUERY_KEYS = new Set([
 
 const CATALOG_QUERY_KEYS = new Set(['page', 'q']);
 const SALES_QUERY_KEYS = new Set(['page', 'q']);
-const FINANCE_QUERY_KEYS = new Set(['from', 'to', 'day']);
+const FINANCE_QUERY_KEYS = new Set(['from', 'to', 'saleId']);
 
 function parsePage(rawValue: unknown): number {
   const parsedValue =
@@ -85,7 +85,7 @@ function normalizeSearchState(search: Record<string, unknown>): RouterSearchStat
     codebar: parseOptionalText(search.codebar),
     from: parseOptionalText(search.from),
     to: parseOptionalText(search.to),
-    day: parseOptionalText(search.day),
+    saleId: parseOptionalText(search.saleId),
   };
 }
 
@@ -151,7 +151,7 @@ function sanitizeSearchForSection(
   return {
     from: search.from,
     to: search.to,
-    day: search.day,
+    saleId: search.saleId,
   };
 }
 
@@ -174,7 +174,7 @@ function isSameSearchState(left: RouterSearchState, right: RouterSearchState): b
     left.codebar === right.codebar &&
     left.from === right.from &&
     left.to === right.to &&
-    left.day === right.day
+    left.saleId === right.saleId
   );
 }
 
@@ -222,7 +222,7 @@ function isQueryCanonical(
           : {
               from: search.from,
               to: search.to,
-              day: search.day,
+              saleId: search.saleId,
             };
 
   for (const [key, expectedValue] of Object.entries(expectedValues)) {
@@ -398,7 +398,8 @@ function SectionView() {
       updateSearch({
         from: next.from === undefined ? currentSearch.from : parseOptionalText(next.from),
         to: next.to === undefined ? currentSearch.to : parseOptionalText(next.to),
-        day: next.day === undefined ? currentSearch.day : parseOptionalText(next.day),
+        saleId:
+          next.saleId === undefined ? currentSearch.saleId : parseOptionalText(next.saleId),
       });
     },
     [currentSearch, sectionPath, updateSearch],
@@ -426,7 +427,7 @@ function SectionView() {
   const financeRouteState: FinanceRouteState = {
     from: currentSearch.from ?? '',
     to: currentSearch.to ?? '',
-    day: currentSearch.day ?? '',
+    saleId: currentSearch.saleId ?? '',
   };
 
   return (

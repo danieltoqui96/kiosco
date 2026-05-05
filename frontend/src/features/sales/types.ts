@@ -33,6 +33,15 @@ export interface Sale {
   items: SaleItem[];
 }
 
+export interface SaleSummary {
+  id: number;
+  soldAt: string;
+  itemsCount: number;
+  totalSale: number;
+  totalCost: number;
+  profit: number;
+}
+
 export interface CreateSalePayload {
   items: Array<{
     productId: number;
@@ -46,4 +55,20 @@ export interface SalesProductsQuery {
   search?: string;
 }
 
+export interface SalesQuery {
+  page?: number;
+  limit?: number;
+  from?: string;
+  to?: string;
+}
+
+export interface UpdateSalePayload {
+  items: Array<{
+    productId: number;
+    quantity: number;
+  }>;
+  soldAt?: string;
+}
+
 export type SalesProductsResult = PaginatedResult<SaleProduct>;
+export type SalesResult = PaginatedResult<SaleSummary>;

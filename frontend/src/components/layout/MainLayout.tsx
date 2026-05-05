@@ -27,7 +27,7 @@ export interface SalesRouteState {
 export interface FinanceRouteState {
   from: string;
   to: string;
-  day: string;
+  saleId: string;
 }
 
 interface MainLayoutProps {

@@ -66,3 +66,12 @@ export interface Sale {
   profit: number;
   items: SaleItem[];
 }
+
+export interface SaleSummary {
+  id: number;
+  soldAt: string;
+  itemsCount: number;
+  totalSale: number;
+  totalCost: number;
+  profit: number;
+}

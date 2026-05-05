@@ -2,17 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FinanceRouteState } from '../../../components/layout/MainLayout';
 import '../../products/styles/products.css';
 import { formatCurrency } from '../../products/presentation.utils';
-import { financeApi } from '../api/finance.api';
-import type { FinanceDailyDetail, FinanceDailySaleDetail, FinanceDailySummary } from '../types';
+import { salesApi } from '../../sales/api/sales.api';
+import type { Sale, SaleSummary } from '../../sales/types';
 
 interface FinancePageProps {
   routeState: FinanceRouteState;
   onRouteStateChange: (next: Partial<FinanceRouteState>) => void;
 }
 
-function formatDayLabel(day: string): string {
-  const date = new Date(`${day}T12:00:00.000Z`);
-  return new Intl.DateTimeFormat('es-CL', { dateStyle: 'full' }).format(date);
+interface EditableSaleItem {
+  productId: number;
+  codebar: string;
+  name: string;
+  quantity: number;
 }
 
 function formatDateTimeLabel(dateTimeIso: string): string {
@@ -22,30 +24,52 @@ function formatDateTimeLabel(dateTimeIso: string): string {
   }).format(new Date(dateTimeIso));
 }
 
+function toDatetimeLocal(isoDateTime: string): string {
+  const date = new Date(isoDateTime);
+  if (Number.isNaN(date.getTime())) return '';
+  const tzOffsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - tzOffsetMs).toISOString().slice(0, 16);
+}
+
+function fromDatetimeLocal(value: string): string | undefined {
+  if (!value.trim()) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+}
+
 export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps) => {
-  const [summaryRows, setSummaryRows] = useState<FinanceDailySummary[]>([]);
-  const [selectedDay, setSelectedDay] = useState(routeState.day);
-  const [dailyDetail, setDailyDetail] = useState<FinanceDailyDetail | null>(null);
-  const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
+  const [salesRows, setSalesRows] = useState<SaleSummary[]>([]);
+  const [selectedSaleId, setSelectedSaleId] = useState<number | null>(
+    routeState.saleId ? Number(routeState.saleId) : null,
+  );
+  const [saleDetail, setSaleDetail] = useState<Sale | null>(null);
   const [fromInput, setFromInput] = useState(routeState.from);
   const [toInput, setToInput] = useState(routeState.to);
   const [fromQuery, setFromQuery] = useState(routeState.from);
   const [toQuery, setToQuery] = useState(routeState.to);
   const [isDetailOpen, setIsDetailOpen] = useState(true);
-  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [isListLoading, setIsListLoading] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editSoldAt, setEditSoldAt] = useState('');
+  const [editItems, setEditItems] = useState<EditableSaleItem[]>([]);
 
   const syncFinanceRoute = useCallback(
     (next: Partial<FinanceRouteState>) => {
       onRouteStateChange({
         from: next.from ?? fromQuery,
         to: next.to ?? toQuery,
-        day: next.day ?? selectedDay,
+        saleId:
+          next.saleId ??
+          (selectedSaleId !== null ? String(selectedSaleId) : ''),
       });
     },
-    [fromQuery, onRouteStateChange, selectedDay, toQuery],
+    [fromQuery, onRouteStateChange, selectedSaleId, toQuery],
   );
 
   useEffect(() => {
@@ -53,54 +77,60 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
     setToInput((current) => (current === routeState.to ? current : routeState.to));
     setFromQuery((current) => (current === routeState.from ? current : routeState.from));
     setToQuery((current) => (current === routeState.to ? current : routeState.to));
-    setSelectedDay((current) => (current === routeState.day ? current : routeState.day));
-  }, [routeState.day, routeState.from, routeState.to]);
 
-  const fetchSummary = useCallback(async () => {
-    setIsSummaryLoading(true);
-    setSummaryError(null);
+    const nextSaleId = routeState.saleId ? Number(routeState.saleId) : null;
+    if (nextSaleId === null || Number.isNaN(nextSaleId)) {
+      setSelectedSaleId((current) => (current === null ? current : null));
+    } else {
+      setSelectedSaleId((current) => (current === nextSaleId ? current : nextSaleId));
+    }
+  }, [routeState.from, routeState.saleId, routeState.to]);
+
+  const fetchSales = useCallback(async () => {
+    setIsListLoading(true);
+    setListError(null);
 
     try {
-      const rows = await financeApi.getDailySummary({
+      const response = await salesApi.getSales({
+        page: 1,
+        limit: 1000,
         from: fromQuery || undefined,
         to: toQuery || undefined,
       });
 
-      setSummaryRows(rows);
+      setSalesRows(response.items);
 
-      if (rows.length === 0) {
-        setSelectedDay('');
-        setDailyDetail(null);
+      if (response.items.length === 0) {
         setSelectedSaleId(null);
-        if (selectedDay !== '') {
-          syncFinanceRoute({ day: '' });
-        }
+        setSaleDetail(null);
+        syncFinanceRoute({ saleId: '' });
         return;
       }
 
-      const hasCurrentDay = selectedDay.length > 0 && rows.some((row) => row.day === selectedDay);
-      if (hasCurrentDay) return;
+      const hasCurrentSale =
+        selectedSaleId !== null &&
+        response.items.some((sale) => sale.id === selectedSaleId);
 
-      const nextDay = rows[0].day;
-      setSelectedDay(nextDay);
-      syncFinanceRoute({ day: nextDay });
+      if (hasCurrentSale) return;
+
+      const nextSaleId = response.items[0].id;
+      setSelectedSaleId(nextSaleId);
+      syncFinanceRoute({ saleId: String(nextSaleId) });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'No se pudo cargar el resumen diario.';
-      setSummaryError(message);
-      setSummaryRows([]);
-      setSelectedDay('');
-      setDailyDetail(null);
+        error instanceof Error ? error.message : 'No se pudieron cargar ventas.';
+      setListError(message);
+      setSalesRows([]);
       setSelectedSaleId(null);
+      setSaleDetail(null);
     } finally {
-      setIsSummaryLoading(false);
+      setIsListLoading(false);
     }
-  }, [fromQuery, selectedDay, syncFinanceRoute, toQuery]);
+  }, [fromQuery, selectedSaleId, syncFinanceRoute, toQuery]);
 
-  const fetchDailyDetail = useCallback(async () => {
-    if (!selectedDay) {
-      setDailyDetail(null);
-      setSelectedSaleId(null);
+  const fetchSaleDetail = useCallback(async () => {
+    if (!selectedSaleId) {
+      setSaleDetail(null);
       return;
     }
 
@@ -108,36 +138,119 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
     setDetailError(null);
 
     try {
-      const detail = await financeApi.getDailyDetail(selectedDay);
-      setDailyDetail(detail);
-      setSelectedSaleId((current) => {
-        if (current && detail.sales.some((sale) => sale.id === current)) return current;
-        return detail.sales[0]?.id ?? null;
-      });
+      const detail = await salesApi.getSaleById(selectedSaleId);
+      setSaleDetail(detail);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'No se pudo cargar el detalle diario.';
+        error instanceof Error
+          ? error.message
+          : 'No se pudo cargar el detalle de la venta.';
       setDetailError(message);
-      setDailyDetail(null);
-      setSelectedSaleId(null);
+      setSaleDetail(null);
     } finally {
       setIsDetailLoading(false);
     }
-  }, [selectedDay]);
+  }, [selectedSaleId]);
 
   useEffect(() => {
-    void fetchSummary();
-  }, [fetchSummary]);
+    void fetchSales();
+  }, [fetchSales]);
 
   useEffect(() => {
-    void fetchDailyDetail();
-  }, [fetchDailyDetail]);
+    void fetchSaleDetail();
+  }, [fetchSaleDetail]);
 
-  const selectedSale = useMemo<FinanceDailySaleDetail | null>(() => {
-    if (!dailyDetail || dailyDetail.sales.length === 0) return null;
-    if (!selectedSaleId) return dailyDetail.sales[0];
-    return dailyDetail.sales.find((sale) => sale.id === selectedSaleId) ?? dailyDetail.sales[0];
-  }, [dailyDetail, selectedSaleId]);
+  const selectedSaleSummary = useMemo(
+    () => salesRows.find((sale) => sale.id === selectedSaleId) ?? null,
+    [salesRows, selectedSaleId],
+  );
+
+  const openEditModal = () => {
+    if (!saleDetail) return;
+
+    setEditSoldAt(toDatetimeLocal(saleDetail.soldAt));
+    setEditItems(
+      saleDetail.items.map((item) => ({
+        productId: item.productId,
+        codebar: item.codebar,
+        name: item.name,
+        quantity: item.quantity,
+      })),
+    );
+    setIsEditModalOpen(true);
+    setActionMessage(null);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditSoldAt('');
+    setEditItems([]);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!saleDetail) return;
+
+    const normalizedItems = editItems
+      .map((item) => ({
+        productId: item.productId,
+        quantity: Math.max(0, Math.floor(item.quantity)),
+      }))
+      .filter((item) => item.quantity > 0);
+
+    if (normalizedItems.length === 0) {
+      setDetailError('La venta debe tener al menos un item con cantidad mayor a 0.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setDetailError(null);
+    setActionMessage(null);
+
+    try {
+      const soldAtIso = fromDatetimeLocal(editSoldAt);
+      const updated = await salesApi.updateSale(saleDetail.id, {
+        items: normalizedItems,
+        soldAt: soldAtIso,
+      });
+
+      closeEditModal();
+      setActionMessage(`Venta #${updated.id} actualizada correctamente.`);
+      await fetchSales();
+      await fetchSaleDetail();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo actualizar la venta.';
+      setDetailError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteSale = async () => {
+    if (!saleDetail) return;
+
+    const shouldDelete = window.confirm(
+      `Deseas eliminar la venta #${saleDetail.id}? Esta accion restituira stock.`,
+    );
+    if (!shouldDelete) return;
+
+    setIsSubmitting(true);
+    setDetailError(null);
+    setActionMessage(null);
+
+    try {
+      await salesApi.deleteSale(saleDetail.id);
+      setActionMessage(`Venta #${saleDetail.id} eliminada correctamente.`);
+      setSaleDetail(null);
+      await fetchSales();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo eliminar la venta.';
+      setDetailError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <>
@@ -186,11 +299,10 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                 const normalizedTo = toInput.trim();
                 setFromQuery(normalizedFrom);
                 setToQuery(normalizedTo);
-                setSelectedDay('');
                 syncFinanceRoute({
                   from: normalizedFrom,
                   to: normalizedTo,
-                  day: '',
+                  saleId: '',
                 });
               }}
             >
@@ -204,28 +316,28 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                 setToInput('');
                 setFromQuery('');
                 setToQuery('');
-                setSelectedDay('');
                 syncFinanceRoute({
                   from: '',
                   to: '',
-                  day: '',
+                  saleId: '',
                 });
               }}
             >
               Limpiar
             </button>
-            <span className="results-count">{summaryRows.length} dias con ventas</span>
+            <span className="results-count">{salesRows.length} ventas en el rango</span>
           </div>
         </section>
 
-        {summaryError ? <p className="form-error">{summaryError}</p> : null}
+        {listError ? <p className="form-error">{listError}</p> : null}
+        {actionMessage ? <p className="form-success">{actionMessage}</p> : null}
 
         <section className="data-table-container">
           <table className="data-table">
             <thead className="table-header">
               <tr>
+                <th className="table-cell table-cell--header">ID</th>
                 <th className="table-cell table-cell--header">Fecha</th>
-                <th className="table-cell table-cell--header table-cell--right">Ventas</th>
                 <th className="table-cell table-cell--header table-cell--right">Items</th>
                 <th className="table-cell table-cell--header table-cell--right">Total venta</th>
                 <th className="table-cell table-cell--header table-cell--right">Costo</th>
@@ -233,55 +345,53 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
               </tr>
             </thead>
             <tbody className="table-body">
-              {isSummaryLoading ? (
+              {isListLoading ? (
                 <tr className="table-row">
                   <td className="table-cell" colSpan={6}>
-                    Cargando resumen diario...
+                    Cargando ventas...
                   </td>
                 </tr>
-              ) : summaryRows.length === 0 ? (
+              ) : salesRows.length === 0 ? (
                 <tr className="table-row">
                   <td className="table-cell" colSpan={6}>
                     No hay ventas en el rango seleccionado.
                   </td>
                 </tr>
               ) : (
-                summaryRows.map((row) => {
-                  const isSelected = row.day === selectedDay;
+                salesRows.map((sale) => {
+                  const isSelected = selectedSaleId === sale.id;
                   return (
                     <tr
-                      key={row.day}
+                      key={sale.id}
                       className={`table-row table-row--clickable${isSelected ? ' table-row--selected' : ''}`}
                       onClick={() => {
-                        setSelectedDay(row.day);
+                        setSelectedSaleId(sale.id);
                         setIsDetailOpen(true);
-                        syncFinanceRoute({ day: row.day });
+                        syncFinanceRoute({ saleId: String(sale.id) });
                       }}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          setSelectedDay(row.day);
+                          setSelectedSaleId(sale.id);
                           setIsDetailOpen(true);
-                          syncFinanceRoute({ day: row.day });
+                          syncFinanceRoute({ saleId: String(sale.id) });
                         }
                       }}
                       tabIndex={0}
                     >
-                      <td className="table-cell">{formatDayLabel(row.day)}</td>
+                      <td className="table-cell table-cell--number">{sale.id}</td>
+                      <td className="table-cell">{formatDateTimeLabel(sale.soldAt)}</td>
                       <td className="table-cell table-cell--right table-cell--number">
-                        {row.salesCount}
+                        {sale.itemsCount}
                       </td>
                       <td className="table-cell table-cell--right table-cell--number">
-                        {row.itemsCount}
+                        {formatCurrency(sale.totalSale)}
                       </td>
                       <td className="table-cell table-cell--right table-cell--number">
-                        {formatCurrency(row.totalSale)}
+                        {formatCurrency(sale.totalCost)}
                       </td>
                       <td className="table-cell table-cell--right table-cell--number">
-                        {formatCurrency(row.totalCost)}
-                      </td>
-                      <td className="table-cell table-cell--right table-cell--number">
-                        {formatCurrency(row.profit)}
+                        {formatCurrency(sale.profit)}
                       </td>
                     </tr>
                   );
@@ -294,7 +404,7 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
 
       <aside className={`detail-panel${isDetailOpen ? ' detail-panel--open' : ''}`}>
         <div className="panel-header">
-          <h2 className="panel-title">Detalle diario</h2>
+          <h2 className="panel-title">Detalle de venta</h2>
           <button
             type="button"
             className="panel-close"
@@ -306,105 +416,47 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
         </div>
 
         <div className="panel-content">
-          {!selectedDay ? (
+          {!selectedSaleSummary ? (
             <div className="detail-section">
               <h4 className="section-title">Sin seleccion</h4>
-              <p className="detail-description">Selecciona un dia para revisar sus ventas.</p>
+              <p className="detail-description">
+                Selecciona una venta de la tabla para ver su detalle.
+              </p>
             </div>
           ) : (
             <>
               <div className="detail-section detail-section--first">
-                <h4 className="section-title">{formatDayLabel(selectedDay)}</h4>
+                <h4 className="section-title">Venta #{selectedSaleSummary.id}</h4>
                 <p className="detail-description">
-                  Informacion agrupada por ventas del dia seleccionado.
+                  Fecha: {formatDateTimeLabel(selectedSaleSummary.soldAt)}
                 </p>
               </div>
 
               {detailError ? <p className="form-error">{detailError}</p> : null}
 
               {isDetailLoading ? (
-                <p className="detail-description">Cargando detalle del dia...</p>
-              ) : dailyDetail ? (
+                <p className="detail-description">Cargando detalle de venta...</p>
+              ) : saleDetail ? (
                 <>
                   <div className="detail-stats">
                     <div className="stat-card">
-                      <span className="stat-label">Ventas</span>
-                      <span className="stat-value">{dailyDetail.salesCount}</span>
-                    </div>
-                    <div className="stat-card">
                       <span className="stat-label">Items</span>
-                      <span className="stat-value">{dailyDetail.itemsCount}</span>
+                      <span className="stat-value">{saleDetail.itemsCount}</span>
                     </div>
                     <div className="stat-card">
-                      <span className="stat-label">Total venta</span>
+                      <span className="stat-label">Total</span>
                       <span className="stat-value stat-value--price">
-                        {formatCurrency(dailyDetail.totalSale)}
+                        {formatCurrency(saleDetail.totalSale)}
                       </span>
                     </div>
-                  </div>
-
-                  <div className="detail-section">
-                    <h4 className="section-title">Ventas del dia</h4>
-                    <div className="data-table-container">
-                      <table className="data-table">
-                        <thead className="table-header">
-                          <tr>
-                            <th className="table-cell table-cell--header">ID venta</th>
-                            <th className="table-cell table-cell--header">Fecha</th>
-                            <th className="table-cell table-cell--header table-cell--right">
-                              Items
-                            </th>
-                            <th className="table-cell table-cell--header table-cell--right">
-                              Total
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="table-body">
-                          {dailyDetail.sales.length === 0 ? (
-                            <tr className="table-row">
-                              <td className="table-cell" colSpan={4}>
-                                No hay ventas registradas este dia.
-                              </td>
-                            </tr>
-                          ) : (
-                            dailyDetail.sales.map((sale) => {
-                              const isSaleSelected = selectedSale?.id === sale.id;
-                              return (
-                                <tr
-                                  key={sale.id}
-                                  className={`table-row table-row--clickable${isSaleSelected ? ' table-row--selected' : ''}`}
-                                  onClick={() => setSelectedSaleId(sale.id)}
-                                  onKeyDown={(event) => {
-                                    if (event.key === 'Enter' || event.key === ' ') {
-                                      event.preventDefault();
-                                      setSelectedSaleId(sale.id);
-                                    }
-                                  }}
-                                  tabIndex={0}
-                                >
-                                  <td className="table-cell table-cell--number">{sale.id}</td>
-                                  <td className="table-cell">{formatDateTimeLabel(sale.soldAt)}</td>
-                                  <td className="table-cell table-cell--right table-cell--number">
-                                    {sale.itemsCount}
-                                  </td>
-                                  <td className="table-cell table-cell--right table-cell--number">
-                                    {formatCurrency(sale.totalSale)}
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
+                    <div className="stat-card">
+                      <span className="stat-label">Utilidad</span>
+                      <span className="stat-value">{formatCurrency(saleDetail.profit)}</span>
                     </div>
                   </div>
 
                   <div className="detail-section">
-                    <h4 className="section-title">
-                      {selectedSale
-                        ? `Items de venta #${selectedSale.id}`
-                        : 'Items de venta'}
-                    </h4>
+                    <h4 className="section-title">Items vendidos</h4>
                     <div className="data-table-container">
                       <table className="data-table">
                         <thead className="table-header">
@@ -417,14 +469,14 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                           </tr>
                         </thead>
                         <tbody className="table-body">
-                          {!selectedSale || selectedSale.items.length === 0 ? (
+                          {saleDetail.items.length === 0 ? (
                             <tr className="table-row">
                               <td className="table-cell" colSpan={5}>
-                                No hay items para esta venta.
+                                Esta venta no tiene items.
                               </td>
                             </tr>
                           ) : (
-                            selectedSale.items.map((item) => (
+                            saleDetail.items.map((item) => (
                               <tr key={item.id} className="table-row">
                                 <td className="table-cell table-cell--number">{item.productId}</td>
                                 <td className="table-cell table-cell--code">{item.codebar}</td>
@@ -447,7 +499,127 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
             </>
           )}
         </div>
+
+        <div className="panel-footer">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={openEditModal}
+            disabled={!saleDetail || isSubmitting}
+          >
+            Editar venta
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger-outline"
+            onClick={() => {
+              void handleDeleteSale();
+            }}
+            disabled={!saleDetail || isSubmitting}
+          >
+            Eliminar venta
+          </button>
+        </div>
       </aside>
+
+      {isEditModalOpen ? (
+        <div className="modal-overlay modal-overlay--visible" role="dialog" aria-modal="true">
+          <div className="modal modal--large">
+            <div className="modal-header">
+              <h3 className="modal-title">Editar venta</h3>
+              <button type="button" className="modal-close" onClick={closeEditModal}>
+                x
+              </button>
+            </div>
+
+            <div className="modal-content">
+              <div className="form-grid">
+                <div className="form-field">
+                  <label className="form-label" htmlFor="edit-sold-at">
+                    Fecha y hora
+                  </label>
+                  <input
+                    id="edit-sold-at"
+                    className="form-input"
+                    type="datetime-local"
+                    value={editSoldAt}
+                    onChange={(event) => setEditSoldAt(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="detail-section">
+                <h4 className="section-title">Items</h4>
+                <div className="info-list">
+                  {editItems.map((item, index) => (
+                    <div key={item.productId} className="info-row">
+                      <div>
+                        <div className="info-value">{item.name}</div>
+                        <div className="info-label">{item.codebar}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setEditItems((current) =>
+                              current.map((currentItem, currentIndex) =>
+                                currentIndex === index
+                                  ? {
+                                      ...currentItem,
+                                      quantity: Math.max(0, currentItem.quantity - 1),
+                                    }
+                                  : currentItem,
+                              ),
+                            );
+                          }}
+                        >
+                          -
+                        </button>
+                        <span className="info-value">{item.quantity}</span>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setEditItems((current) =>
+                              current.map((currentItem, currentIndex) =>
+                                currentIndex === index
+                                  ? {
+                                      ...currentItem,
+                                      quantity: currentItem.quantity + 1,
+                                    }
+                                  : currentItem,
+                              ),
+                            );
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-ghost" onClick={closeEditModal}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  void handleSaveEdit();
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Guardando...' : 'Guardar cambios'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 };
