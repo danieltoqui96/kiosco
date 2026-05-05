@@ -12,12 +12,10 @@ import { Home } from './pages/Home';
 import type {
   AppSection,
   CatalogRouteState,
-  FinanceRouteState,
   ProductRouteState,
-  SalesRouteState,
 } from './components/layout/MainLayout';
 
-type SectionPath = 'productos' | 'categorias' | 'marcas' | 'ventas' | 'finanzas';
+type SectionPath = 'productos' | 'categorias' | 'marcas';
 
 interface RouterSearchState {
   page?: number;
@@ -27,9 +25,6 @@ interface RouterSearchState {
   category?: string;
   status?: 'true' | 'false';
   codebar?: string;
-  from?: string;
-  to?: string;
-  saleId?: string;
 }
 
 const defaultProductsSearch: RouterSearchState = {
@@ -46,8 +41,6 @@ const PRODUCT_QUERY_KEYS = new Set([
 ]);
 
 const CATALOG_QUERY_KEYS = new Set(['page', 'q']);
-const SALES_QUERY_KEYS = new Set(['from', 'to', 'saleId']);
-const FINANCE_QUERY_KEYS = new Set(['from', 'to', 'saleId']);
 
 function parsePage(rawValue: unknown): number {
   const parsedValue =
@@ -83,36 +76,23 @@ function normalizeSearchState(search: Record<string, unknown>): RouterSearchStat
     category: parseOptionalText(search.category),
     status: parseStatus(search.status),
     codebar: parseOptionalText(search.codebar),
-    from: parseOptionalText(search.from),
-    to: parseOptionalText(search.to),
-    saleId: parseOptionalText(search.saleId),
   };
 }
 
 function toSection(sectionPath: SectionPath): AppSection {
   if (sectionPath === 'categorias') return 'categories';
   if (sectionPath === 'marcas') return 'brands';
-  if (sectionPath === 'ventas') return 'sales';
-  if (sectionPath === 'finanzas') return 'finance';
   return 'products';
 }
 
 function toSectionPath(section: AppSection): SectionPath {
   if (section === 'categories') return 'categorias';
   if (section === 'brands') return 'marcas';
-  if (section === 'sales') return 'ventas';
-  if (section === 'finance') return 'finanzas';
   return 'productos';
 }
 
 function isAllowedSection(section: string): section is SectionPath {
-  return (
-    section === 'productos' ||
-    section === 'categorias' ||
-    section === 'marcas' ||
-    section === 'ventas' ||
-    section === 'finanzas'
-  );
+  return section === 'productos' || section === 'categorias' || section === 'marcas';
 }
 
 function getSectionPath(section: string): SectionPath {
@@ -134,35 +114,15 @@ function sanitizeSearchForSection(
     };
   }
 
-  if (section === 'categorias' || section === 'marcas') {
-    return {
-      page: parsePage(search.page),
-      q: search.q,
-    };
-  }
-
-  if (section === 'ventas') {
-    return {
-      from: search.from,
-      to: search.to,
-      saleId: search.saleId,
-    };
-  }
-
   return {
-    from: search.from,
-    to: search.to,
-    saleId: search.saleId,
+    page: parsePage(search.page),
+    q: search.q,
   };
 }
 
 function getDefaultSearchState(section: SectionPath): RouterSearchState {
   if (section === 'productos') return defaultProductsSearch;
-  if (section === 'categorias' || section === 'marcas') {
-    return { page: 1 };
-  }
-  if (section === 'ventas') return {};
-  return {};
+  return { page: 1 };
 }
 
 function isSameSearchState(left: RouterSearchState, right: RouterSearchState): boolean {
@@ -173,10 +133,7 @@ function isSameSearchState(left: RouterSearchState, right: RouterSearchState): b
     left.brand === right.brand &&
     left.category === right.category &&
     left.status === right.status &&
-    left.codebar === right.codebar &&
-    left.from === right.from &&
-    left.to === right.to &&
-    left.saleId === right.saleId
+    left.codebar === right.codebar
   );
 }
 
@@ -187,14 +144,7 @@ function isQueryCanonical(
   if (typeof window === 'undefined') return true;
 
   const params = new URLSearchParams(window.location.search);
-  const allowedKeys =
-    section === 'productos'
-      ? PRODUCT_QUERY_KEYS
-      : section === 'ventas'
-        ? SALES_QUERY_KEYS
-        : section === 'finanzas'
-          ? FINANCE_QUERY_KEYS
-          : CATALOG_QUERY_KEYS;
+  const allowedKeys = section === 'productos' ? PRODUCT_QUERY_KEYS : CATALOG_QUERY_KEYS;
 
   for (const key of params.keys()) {
     if (!allowedKeys.has(key)) return false;
@@ -211,22 +161,10 @@ function isQueryCanonical(
           status: search.status,
           codebar: search.codebar,
         }
-      : section === 'categorias' || section === 'marcas'
-        ? {
-            page: String(parsePage(search.page)),
-            q: search.q,
-          }
-        : section === 'ventas'
-          ? {
-              from: search.from,
-              to: search.to,
-              saleId: search.saleId,
-            }
-          : {
-              from: search.from,
-              to: search.to,
-              saleId: search.saleId,
-            };
+      : {
+          page: String(parsePage(search.page)),
+          q: search.q,
+        };
 
   for (const [key, expectedValue] of Object.entries(expectedValues)) {
     const actualValue = params.get(key);
@@ -379,34 +317,6 @@ function SectionView() {
     [currentSearch, sectionPath, updateSearch],
   );
 
-  const handleSalesRouteStateChange = useCallback(
-    (next: Partial<SalesRouteState>) => {
-      if (sectionPath !== 'ventas') return;
-
-      updateSearch({
-        from: next.from === undefined ? currentSearch.from : parseOptionalText(next.from),
-        to: next.to === undefined ? currentSearch.to : parseOptionalText(next.to),
-        saleId:
-          next.saleId === undefined ? currentSearch.saleId : parseOptionalText(next.saleId),
-      });
-    },
-    [currentSearch, sectionPath, updateSearch],
-  );
-
-  const handleFinanceRouteStateChange = useCallback(
-    (next: Partial<FinanceRouteState>) => {
-      if (sectionPath !== 'finanzas') return;
-
-      updateSearch({
-        from: next.from === undefined ? currentSearch.from : parseOptionalText(next.from),
-        to: next.to === undefined ? currentSearch.to : parseOptionalText(next.to),
-        saleId:
-          next.saleId === undefined ? currentSearch.saleId : parseOptionalText(next.saleId),
-      });
-    },
-    [currentSearch, sectionPath, updateSearch],
-  );
-
   const productRouteState: ProductRouteState = {
     page: parsePage(currentSearch.page),
     search: currentSearch.search ?? '',
@@ -421,18 +331,6 @@ function SectionView() {
     q: currentSearch.q ?? '',
   };
 
-  const salesRouteState: SalesRouteState = {
-    from: currentSearch.from ?? '',
-    to: currentSearch.to ?? '',
-    saleId: currentSearch.saleId ?? '',
-  };
-
-  const financeRouteState: FinanceRouteState = {
-    from: currentSearch.from ?? '',
-    to: currentSearch.to ?? '',
-    saleId: currentSearch.saleId ?? '',
-  };
-
   return (
     <Home
       section={currentSection}
@@ -441,10 +339,6 @@ function SectionView() {
       onProductRouteStateChange={handleProductRouteStateChange}
       catalogRouteState={catalogRouteState}
       onCatalogRouteStateChange={handleCatalogRouteStateChange}
-      salesRouteState={salesRouteState}
-      onSalesRouteStateChange={handleSalesRouteStateChange}
-      financeRouteState={financeRouteState}
-      onFinanceRouteStateChange={handleFinanceRouteStateChange}
     />
   );
 }
