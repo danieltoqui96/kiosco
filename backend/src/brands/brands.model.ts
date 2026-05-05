@@ -92,6 +92,23 @@ export class BrandsModel {
     const current = await this.getBrandById(id);
     if (!current) return null;
 
+    const [usageRows] = await pool.query<CountRow[]>(
+      `
+        SELECT COUNT(*) AS total
+        FROM products
+        WHERE brand_id = ?
+      `,
+      [id],
+    );
+
+    const productsUsingBrand = usageRows[0]?.total ?? 0;
+    if (productsUsingBrand > 0) {
+      throw {
+        message: 'No se puede eliminar una marca con productos asociados.',
+        statusCode: 409,
+      };
+    }
+
     const [result] = await pool.query<ResultSetHeader>(
       'DELETE FROM brands WHERE id = ?',
       [id],

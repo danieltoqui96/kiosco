@@ -225,6 +225,24 @@ export class ProductsModel {
     const product = await this.getProductById(id);
     if (!product) return null;
 
+    const [saleItemRows] = await pool.query<CountRow[]>(
+      `
+        SELECT COUNT(*) AS total
+        FROM sale_items
+        WHERE product_id = ?
+      `,
+      [id],
+    );
+
+    const salesUsingProduct = saleItemRows[0]?.total ?? 0;
+    if (salesUsingProduct > 0) {
+      throw {
+        message:
+          'No se puede eliminar un producto con ventas registradas. Desactivalo en su lugar.',
+        statusCode: 409,
+      };
+    }
+
     const [result] = await pool.query<ResultSetHeader>(
       'DELETE FROM products WHERE id = ?',
       [id],

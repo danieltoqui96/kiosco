@@ -132,6 +132,14 @@ export class ProductsController {
 
       return res.success(product, 'Producto eliminado correctamente', 200);
     } catch (error) {
+      const statusCode = getStatusCode(error);
+      if (statusCode) {
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
+      }
       return res.error('Error al eliminar el producto', 500, getErrorData(error));
     }
   }

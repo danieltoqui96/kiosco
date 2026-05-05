@@ -96,6 +96,23 @@ export class CategoriesModel {
     const current = await this.getCategoryById(id);
     if (!current) return null;
 
+    const [usageRows] = await pool.query<CountRow[]>(
+      `
+        SELECT COUNT(*) AS total
+        FROM products
+        WHERE category_id = ?
+      `,
+      [id],
+    );
+
+    const productsUsingCategory = usageRows[0]?.total ?? 0;
+    if (productsUsingCategory > 0) {
+      throw {
+        message: 'No se puede eliminar una categoria con productos asociados.',
+        statusCode: 409,
+      };
+    }
+
     const [result] = await pool.query<ResultSetHeader>(
       'DELETE FROM categories WHERE id = ?',
       [id],
