@@ -34,6 +34,26 @@ export interface ProductsFilters {
 }
 
 export class ProductsModel {
+  private static async cleanupOrphanCatalogs(): Promise<void> {
+    await pool.query(
+      `
+        DELETE b
+        FROM brands b
+        LEFT JOIN products p ON p.brand_id = b.id
+        WHERE p.id IS NULL
+      `,
+    );
+
+    await pool.query(
+      `
+        DELETE c
+        FROM categories c
+        LEFT JOIN products p ON p.category_id = c.id
+        WHERE p.id IS NULL
+      `,
+    );
+  }
+
   static async getAllProducts(
     pagination: PaginationParams,
     filters: ProductsFilters,
@@ -191,6 +211,9 @@ export class ProductsModel {
     id: number,
     data: UpdateProduct,
   ): Promise<Product | null> {
+    const beforeUpdate = await this.getProductById(id);
+    if (!beforeUpdate) return null;
+
     const mapData = mapProductToProductDB(data);
     const cleanData = removeUndefined(mapData);
 
@@ -209,7 +232,18 @@ export class ProductsModel {
       [cleanData, id],
     );
 
-    if (result.affectedRows === 0) return null;
+    if (result.affectedRows === 0) return beforeUpdate;
+
+    try {
+      if (
+        data.brand !== undefined ||
+        data.category !== undefined
+      ) {
+        await this.cleanupOrphanCatalogs();
+      }
+    } catch {
+      // Best-effort cleanup: product update should still succeed.
+    }
 
     const product = await this.getProductById(id);
     if (!product) {
@@ -230,6 +264,13 @@ export class ProductsModel {
       [id],
     );
     if (result.affectedRows === 0) return null;
+
+    try {
+      await this.cleanupOrphanCatalogs();
+    } catch {
+      // Best-effort cleanup after delete.
+    }
+
     return product;
   }
 

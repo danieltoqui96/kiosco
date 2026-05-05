@@ -1,11 +1,4 @@
-import type { AppSection } from './MainLayout';
-
-interface SidebarProps {
-  currentSection: AppSection;
-  onNavigate: (section: AppSection) => void;
-}
-
-export const Sidebar = ({ currentSection, onNavigate }: SidebarProps) => {
+export const Sidebar = () => {
   return (
     <div>
       <aside className="sidebar">
@@ -17,27 +10,10 @@ export const Sidebar = ({ currentSection, onNavigate }: SidebarProps) => {
         <nav className="sidebar-nav">
           <button
             type="button"
-            className={`nav-item${currentSection === 'products' ? ' active' : ''}`}
-            onClick={() => onNavigate('products')}
+            className="nav-item active"
           >
             <span className="nav-icon">P</span>
             <span className="nav-label">Productos</span>
-          </button>
-          <button
-            type="button"
-            className={`nav-item${currentSection === 'categories' ? ' active' : ''}`}
-            onClick={() => onNavigate('categories')}
-          >
-            <span className="nav-icon">C</span>
-            <span className="nav-label">Categorias</span>
-          </button>
-          <button
-            type="button"
-            className={`nav-item${currentSection === 'brands' ? ' active' : ''}`}
-            onClick={() => onNavigate('brands')}
-          >
-            <span className="nav-icon">M</span>
-            <span className="nav-label">Marcas</span>
           </button>
         </nav>
       </aside>
