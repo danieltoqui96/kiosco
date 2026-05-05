@@ -15,6 +15,8 @@ interface EditableSaleItem {
   codebar: string;
   name: string;
   brand: string;
+  stock: number;
+  baseQuantity: number;
   unitSalePrice: number;
   quantity: number;
 }
@@ -38,6 +40,14 @@ function fromDatetimeLocal(value: string): string | undefined {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   return date.toISOString();
+}
+
+function getEditableItemMaxQuantity(item: EditableSaleItem): number {
+  return Math.max(0, item.baseQuantity + item.stock);
+}
+
+function getEditableItemAvailableStock(item: EditableSaleItem): number {
+  return Math.max(0, getEditableItemMaxQuantity(item) - item.quantity);
 }
 
 export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps) => {
@@ -103,10 +113,11 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
         from: fromQuery || undefined,
         to: toQuery || undefined,
       });
+      const sortedItems = [...response.items].sort((a, b) => b.id - a.id);
 
-      setSalesRows(response.items);
+      setSalesRows(sortedItems);
 
-      if (response.items.length === 0) {
+      if (sortedItems.length === 0) {
         setSelectedSaleId(null);
         setSaleDetail(null);
         syncFinanceRoute({ saleId: '' });
@@ -115,11 +126,11 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
 
       const hasCurrentSale =
         selectedSaleId !== null &&
-        response.items.some((sale) => sale.id === selectedSaleId);
+        sortedItems.some((sale) => sale.id === selectedSaleId);
 
       if (hasCurrentSale) return;
 
-      const nextSaleId = response.items[0].id;
+      const nextSaleId = sortedItems[0].id;
       setSelectedSaleId(nextSaleId);
       syncFinanceRoute({ saleId: String(nextSaleId) });
     } catch (error) {
@@ -181,6 +192,8 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
         codebar: item.codebar,
         name: item.name,
         brand: item.brand,
+        stock: item.stock,
+        baseQuantity: item.quantity,
         unitSalePrice: item.unitSalePrice,
         quantity: item.quantity,
       })),
@@ -237,19 +250,22 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
       return;
     }
 
+    const saleId = saleDetail.id;
+    const currentSoldAt = editSoldAt;
+    const currentItems = normalizedItems;
     setIsSubmitting(true);
     setDetailError(null);
     setActionMessage(null);
+    closeEditModal();
 
     try {
-      const soldAtIso = fromDatetimeLocal(editSoldAt);
-      const updated = await salesApi.updateSale(saleDetail.id, {
-        items: normalizedItems,
+      const soldAtIso = fromDatetimeLocal(currentSoldAt);
+      const updated = await salesApi.updateSale(saleId, {
+        items: currentItems,
         soldAt: soldAtIso,
       });
-
-      closeEditModal();
       setActionMessage(`Venta #${updated.id} actualizada correctamente.`);
+      window.dispatchEvent(new Event('inventory:changed'));
       await fetchSales();
       await fetchSaleDetail();
     } catch (error) {
@@ -277,6 +293,7 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
       await salesApi.deleteSale(saleDetail.id);
       setActionMessage(`Venta #${saleDetail.id} eliminada correctamente.`);
       setSaleDetail(null);
+      window.dispatchEvent(new Event('inventory:changed'));
       await fetchSales();
     } catch (error) {
       const message =
@@ -588,6 +605,7 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                     <span>Codigo</span>
                     <span>Producto</span>
                     <span>Marca</span>
+                    <span>Stock</span>
                     <span>Precio</span>
                     <span>Cantidad</span>
                   </div>
@@ -602,6 +620,9 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                         </div>
                         <div className="sales-edit-item-field">
                           <span className="info-value">{item.brand || 'Sin marca'}</span>
+                        </div>
+                        <div className="sales-edit-item-field">
+                          <span className="info-value">{getEditableItemAvailableStock(item)}</span>
                         </div>
                         <div className="sales-edit-item-field">
                           <span className="info-value">{formatCurrency(item.unitSalePrice)}</span>
@@ -630,13 +651,17 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                         <button
                           type="button"
                           className="btn btn-ghost"
+                          disabled={item.quantity >= getEditableItemMaxQuantity(item)}
                           onClick={() => {
                             setEditItems((current) =>
                               current.map((currentItem, currentIndex) =>
                                 currentIndex === index
                                   ? {
                                       ...currentItem,
-                                      quantity: currentItem.quantity + 1,
+                                      quantity: Math.min(
+                                        getEditableItemMaxQuantity(currentItem),
+                                        currentItem.quantity + 1,
+                                      ),
                                     }
                                   : currentItem,
                               ),
@@ -715,50 +740,84 @@ export const FinancePage = ({ routeState, onRouteStateChange }: FinancePageProps
                           </td>
                         </tr>
                       ) : (
-                        editSearchResults.map((product) => (
-                          <tr key={product.id} className="table-row">
-                            <td className="table-cell">{product.name}</td>
-                            <td className="table-cell">{product.brand}</td>
-                            <td className="table-cell table-cell--code">{product.codebar}</td>
-                            <td className="table-cell table-cell--right table-cell--number">
-                              {product.stock}
-                            </td>
-                            <td className="table-cell">
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={() => {
-                                  setEditItems((current) => {
-                                    const existing = current.find(
-                                      (item) => item.productId === product.id,
-                                    );
-                                    if (existing) {
-                                      return current.map((item) =>
-                                        item.productId === product.id
-                                          ? { ...item, quantity: item.quantity + 1 }
-                                          : item,
-                                      );
-                                    }
+                        editSearchResults.map((product) => {
+                          const existing = editItems.find(
+                            (item) => item.productId === product.id,
+                          );
+                          const availableStock = existing
+                            ? Math.max(
+                                0,
+                                existing.baseQuantity + product.stock - existing.quantity,
+                              )
+                            : Math.max(0, product.stock);
+                          const canAdd = availableStock > 0;
 
-                                    return [
-                                      ...current,
-                                      {
-                                        productId: product.id,
-                                        codebar: product.codebar,
-                                        name: product.name,
-                                        brand: product.brand,
-                                        unitSalePrice: product.salePrice,
-                                        quantity: 1,
-                                      },
-                                    ];
-                                  });
-                                }}
-                              >
-                                Agregar
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                          return (
+                            <tr key={product.id} className="table-row">
+                              <td className="table-cell">{product.name}</td>
+                              <td className="table-cell">{product.brand}</td>
+                              <td className="table-cell table-cell--code">{product.codebar}</td>
+                              <td className="table-cell table-cell--right table-cell--number">
+                                {availableStock}
+                              </td>
+                              <td className="table-cell">
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  disabled={!canAdd}
+                                  onClick={() => {
+                                    setEditItems((current) => {
+                                      const currentExisting = current.find(
+                                        (item) => item.productId === product.id,
+                                      );
+
+                                      if (currentExisting) {
+                                        const maxForCurrent = Math.max(
+                                          0,
+                                          currentExisting.baseQuantity + product.stock,
+                                        );
+                                        if (currentExisting.quantity >= maxForCurrent) {
+                                          return current;
+                                        }
+
+                                        return current.map((item) =>
+                                          item.productId === product.id
+                                            ? {
+                                                ...item,
+                                                stock: product.stock,
+                                                quantity: Math.min(
+                                                  maxForCurrent,
+                                                  item.quantity + 1,
+                                                ),
+                                              }
+                                            : item,
+                                        );
+                                      }
+
+                                      if (product.stock <= 0) return current;
+
+                                      return [
+                                        ...current,
+                                        {
+                                          productId: product.id,
+                                          codebar: product.codebar,
+                                          name: product.name,
+                                          brand: product.brand,
+                                          stock: product.stock,
+                                          baseQuantity: 0,
+                                          unitSalePrice: product.salePrice,
+                                          quantity: 1,
+                                        },
+                                      ];
+                                    });
+                                  }}
+                                >
+                                  Agregar
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>

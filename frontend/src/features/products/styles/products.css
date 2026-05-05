@@ -128,7 +128,13 @@
 
 .sales-edit-item-row {
   display: grid;
-  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.4fr) minmax(120px, 1fr) minmax(110px, 0.8fr) 130px;
+  grid-template-columns:
+    minmax(120px, 1fr)
+    minmax(170px, 1.4fr)
+    minmax(110px, 1fr)
+    minmax(70px, 0.6fr)
+    minmax(110px, 0.8fr)
+    130px;
   align-items: center;
   gap: var(--space-md);
   padding: var(--space-sm) 0;
@@ -145,7 +151,13 @@
 
 .sales-edit-items-header {
   display: grid;
-  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.4fr) minmax(120px, 1fr) minmax(110px, 0.8fr) 130px;
+  grid-template-columns:
+    minmax(120px, 1fr)
+    minmax(170px, 1.4fr)
+    minmax(110px, 1fr)
+    minmax(70px, 0.6fr)
+    minmax(110px, 0.8fr)
+    130px;
   gap: var(--space-md);
   padding-bottom: 6px;
   margin-bottom: 2px;

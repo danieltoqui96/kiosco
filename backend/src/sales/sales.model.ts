@@ -21,6 +21,14 @@ function toIsoDateTime(value: Date | string): string {
   return new Date(value).toISOString();
 }
 
+function toMySqlDateTime(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw { message: 'Fecha de venta invalida.', statusCode: 400 };
+  }
+  return parsed.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 function mapSaleItemRow(row: SaleItemRow): SaleItem {
   return {
     id: row.id,
@@ -29,6 +37,7 @@ function mapSaleItemRow(row: SaleItemRow): SaleItem {
     codebar: row.product_codebar,
     name: row.product_name,
     brand: row.product_brand ?? '',
+    stock: row.product_stock ?? 0,
     quantity: row.quantity,
     unitSalePrice: row.unit_sale_price,
     unitPurchasePrice: row.unit_purchase_price,
@@ -106,7 +115,7 @@ export class SalesModel {
           profit
         FROM sales
         ${whereSql}
-        ORDER BY sold_at DESC, id DESC
+        ORDER BY id DESC
         LIMIT ? OFFSET ?
       `,
       [...whereParams, pagination.limit, pagination.offset],
@@ -220,6 +229,7 @@ export class SalesModel {
           si.product_codebar,
           si.product_name,
           b.name AS product_brand,
+          p.stock AS product_stock,
           si.quantity,
           si.unit_sale_price,
           si.unit_purchase_price,
@@ -469,13 +479,14 @@ export class SalesModel {
       const profit = totalSale - totalCost;
 
       if (data.soldAt) {
+        const soldAtMySql = toMySqlDateTime(data.soldAt);
         await connection.query<ResultSetHeader>(
           `
             UPDATE sales
             SET sold_at = ?, items_count = ?, total_sale = ?, total_cost = ?, profit = ?
             WHERE id = ?
           `,
-          [data.soldAt, itemsCount, totalSale, totalCost, profit, saleId],
+          [soldAtMySql, itemsCount, totalSale, totalCost, profit, saleId],
         );
       } else {
         await connection.query<ResultSetHeader>(
@@ -738,7 +749,7 @@ export class SalesModel {
           INSERT INTO sales (sold_at, items_count, total_sale, total_cost, profit)
           VALUES (COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?, ?)
         `,
-        [soldAt ?? null, itemsCount, totalSale, totalCost, profit],
+        [soldAt ? toMySqlDateTime(soldAt) : null, itemsCount, totalSale, totalCost, profit],
       );
 
       const saleId = saleResult.insertId;
@@ -833,6 +844,7 @@ export class SalesModel {
           si.product_codebar,
           si.product_name,
           b.name AS product_brand,
+          p.stock AS product_stock,
           si.quantity,
           si.unit_sale_price,
           si.unit_purchase_price,

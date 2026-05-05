@@ -28,6 +28,7 @@ export interface SaleItemRow extends RowDataPacket {
   product_codebar: string;
   product_name: string;
   product_brand?: string | null;
+  product_stock?: number | null;
   quantity: number;
   unit_sale_price: number;
   unit_purchase_price: number;
@@ -52,6 +53,7 @@ export interface SaleItem {
   codebar: string;
   name: string;
   brand: string;
+  stock: number;
   quantity: number;
   unitSalePrice: number;
   unitPurchasePrice: number;

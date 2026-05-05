@@ -224,6 +224,18 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     void fetchCatalogs();
   }, [fetchCatalogs]);
 
+  useEffect(() => {
+    const handleInventoryChange = () => {
+      void fetchProducts();
+      void fetchCatalogs();
+    };
+
+    window.addEventListener('inventory:changed', handleInventoryChange);
+    return () => {
+      window.removeEventListener('inventory:changed', handleInventoryChange);
+    };
+  }, [fetchCatalogs, fetchProducts]);
+
   const selectedProduct = useMemo(
     () => products.find((product) => product.id === selectedProductId) ?? null,
     [products, selectedProductId],

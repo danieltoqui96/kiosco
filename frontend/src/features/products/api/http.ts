@@ -40,6 +40,7 @@ export async function requestJson<TData>(
   try {
     const response = await fetch(buildUrl(path, options?.query), {
       method: options?.method ?? 'GET',
+      cache: options?.cache ?? 'no-store',
       headers: {
         'Content-Type': 'application/json',
         ...(options?.headers ?? {}),

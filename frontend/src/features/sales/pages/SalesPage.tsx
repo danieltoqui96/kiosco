@@ -219,6 +219,7 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
       setSuccessMessage(
         `Venta #${sale.id} registrada. Total: ${formatCurrency(sale.totalSale)}.`,
       );
+      window.dispatchEvent(new Event('inventory:changed'));
 
       if (page !== 1) {
         setPage(1);

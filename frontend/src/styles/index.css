@@ -45,6 +45,7 @@
   --bg-card: #ffffff;
   --bg-hover: #f9fafb;
   --bg-selected: #eff6ff;
+  --detail-panel-width: 460px;
 
   /* Border Colors */
   --border-light: #e5e7eb;
@@ -115,8 +116,18 @@ body {
 /* ==================== APP LAYOUT ==================== */
 .app-layout {
   display: grid;
-  grid-template-columns: 240px 1fr 380px;
+  grid-template-columns: 240px minmax(0, 1fr) var(--detail-panel-width);
   min-height: 100vh;
+}
+
+.app-layout > .main-content {
+  min-width: 0;
+}
+
+.app-layout > .detail-panel {
+  width: var(--detail-panel-width);
+  min-width: var(--detail-panel-width);
+  max-width: var(--detail-panel-width);
 }
 
 /* ==================== SIDEBAR ==================== */
@@ -791,6 +802,8 @@ body {
   border-left: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
+  width: var(--detail-panel-width);
+  min-width: var(--detail-panel-width);
   height: 100vh;
   position: sticky;
   top: 0;

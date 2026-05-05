@@ -17,6 +17,7 @@ export interface SaleItem {
   codebar: string;
   name: string;
   brand: string;
+  stock: number;
   quantity: number;
   unitSalePrice: number;
   unitPurchasePrice: number;
