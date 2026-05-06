@@ -7,3 +7,5 @@ salesRouter.get('/', SalesController.getAllSales);
 salesRouter.get('/products', SalesController.getSaleProducts);
 salesRouter.get('/:id', SalesController.getSaleById);
 salesRouter.post('/', SalesController.addSale);
+salesRouter.put('/:id', SalesController.updateSale);
+salesRouter.delete('/:id', SalesController.deleteSale);

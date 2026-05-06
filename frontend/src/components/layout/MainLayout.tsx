@@ -15,6 +15,8 @@ export interface ProductRouteState {
 export interface SalesRouteState {
   page: number;
   q: string;
+  paymentMethod: '' | 'cash' | 'card';
+  soldDate: string;
 }
 
 interface MainLayoutProps {

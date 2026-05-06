@@ -13,6 +13,8 @@ export const createSaleSchema = z.object({
   soldAt: z.string().datetime().optional(),
 });
 
+export const updateSaleSchema = createSaleSchema;
+
 export const saleItemSchema = z.object({
   productId: z.number().int().positive(),
   productCodebar: z.string().min(1),
@@ -45,6 +47,7 @@ export const saleProductSchema = z.object({
 });
 
 export type CreateSale = z.infer<typeof createSaleSchema>;
+export type UpdateSale = z.infer<typeof updateSaleSchema>;
 export type SaleSummary = z.infer<typeof saleSummarySchema>;
 export type SaleItem = z.infer<typeof saleItemSchema>;
 export type SaleDetail = z.infer<typeof saleDetailSchema>;

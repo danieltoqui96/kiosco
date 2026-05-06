@@ -52,4 +52,6 @@ export interface SaleQueryParams {
   page?: number;
   limit?: number;
   q?: string;
+  paymentMethod?: '' | 'cash' | 'card';
+  soldDate?: string;
 }

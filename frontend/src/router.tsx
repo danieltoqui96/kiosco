@@ -26,6 +26,8 @@ interface ProductRouterSearchState {
 interface SalesRouterSearchState {
   page?: number;
   q?: string;
+  paymentMethod?: 'cash' | 'card';
+  soldDate?: string;
 }
 
 const defaultProductsSearch: ProductRouterSearchState = {
@@ -72,9 +74,18 @@ function normalizeProductsSearch(
 }
 
 function normalizeSalesSearch(search: Record<string, unknown>): SalesRouterSearchState {
+  const paymentRaw = search.paymentMethod;
+  const paymentMethod =
+    paymentRaw === 'cash' || paymentRaw === 'card' ? paymentRaw : undefined;
+  const soldDateRaw = parseOptionalText(search.soldDate);
+  const soldDate =
+    soldDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(soldDateRaw) ? soldDateRaw : undefined;
+
   return {
     page: parsePage(search.page),
     q: parseOptionalText(search.q),
+    paymentMethod,
+    soldDate,
   };
 }
 
@@ -129,6 +140,8 @@ function ProductsView() {
   const salesRouteState: SalesRouteState = {
     page: 1,
     q: '',
+    paymentMethod: '',
+    soldDate: '',
   };
 
   const handleProductRouteStateChange = useCallback(
@@ -192,6 +205,8 @@ function SalesView() {
   const salesRouteState: SalesRouteState = {
     page: parsePage(search.page),
     q: search.q ?? '',
+    paymentMethod: search.paymentMethod ?? '',
+    soldDate: search.soldDate ?? '',
   };
 
   const productRouteState: ProductRouteState = {
@@ -216,6 +231,14 @@ function SalesView() {
             next.q === undefined
               ? parseOptionalText(salesRouteState.q)
               : parseOptionalText(next.q),
+          paymentMethod:
+            next.paymentMethod === undefined
+              ? salesRouteState.paymentMethod || undefined
+              : next.paymentMethod || undefined,
+          soldDate:
+            next.soldDate === undefined
+              ? parseOptionalText(salesRouteState.soldDate)
+              : parseOptionalText(next.soldDate),
         },
         replace: true,
       });

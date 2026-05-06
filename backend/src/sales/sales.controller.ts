@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { createSaleSchema } from './sales.schema.js';
+import { createSaleSchema, updateSaleSchema } from './sales.schema.js';
 import { SalesModel } from './sales.model.js';
 import {
   getErrorData,
@@ -15,7 +15,14 @@ export class SalesController {
     try {
       const pagination = getPaginationParams(req.query.page, req.query.limit);
       const search = getQueryString(req.query.q) ?? getQueryString(req.query.search);
-      const sales = await SalesModel.getAllSales(pagination, search);
+      const paymentMethod = getQueryString(req.query.paymentMethod);
+      const soldDate = getQueryString(req.query.soldDate);
+      const sales = await SalesModel.getAllSales(
+        pagination,
+        search,
+        paymentMethod,
+        soldDate,
+      );
       return res.success(sales, 'Ventas obtenidas con exito', 200);
     } catch (error) {
       return res.error('Error al obtener las ventas', 500, getErrorData(error));
@@ -70,6 +77,57 @@ export class SalesController {
         );
       }
       return res.error('Error al registrar la venta', 500, getErrorData(error));
+    }
+  }
+
+  static async updateSale(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.error('ID de venta invalido', 400);
+      }
+
+      const parsed = updateSaleSchema.safeParse(req.body);
+      if (!parsed.success) return res.error('Datos invalidos', 400, parsed.error.issues);
+
+      const sale = await SalesModel.updateSale(id, parsed.data);
+      if (!sale) return res.error('Venta no encontrada', 404);
+
+      return res.success(sale, 'Venta actualizada correctamente', 200);
+    } catch (error) {
+      const statusCode = getStatusCode(error);
+      if (statusCode) {
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
+      }
+      return res.error('Error al actualizar la venta', 500, getErrorData(error));
+    }
+  }
+
+  static async deleteSale(req: Request, res: Response) {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.error('ID de venta invalido', 400);
+      }
+
+      const sale = await SalesModel.deleteSale(id);
+      if (!sale) return res.error('Venta no encontrada', 404);
+
+      return res.success(sale, 'Venta eliminada correctamente', 200);
+    } catch (error) {
+      const statusCode = getStatusCode(error);
+      if (statusCode) {
+        return res.error(
+          String((error as { message?: string }).message),
+          statusCode,
+          getErrorData(error),
+        );
+      }
+      return res.error('Error al eliminar la venta', 500, getErrorData(error));
     }
   }
 }

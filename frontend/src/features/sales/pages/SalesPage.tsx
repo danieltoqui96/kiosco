@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import '../../../features/products/styles/products.css';
 import { ApiClientError } from '../../products/api/http';
+import { productsApi } from '../../products/api/products.api';
 import { formatCurrency } from '../../products/presentation.utils';
 import type { SalesRouteState } from '../../../components/layout/MainLayout';
 import { salesApi } from '../api/sales.api';
@@ -12,7 +13,7 @@ import type {
 
 const DEFAULT_PAGE_SIZE = 10;
 const MODAL_PRODUCTS_LIMIT = 100;
-const MODAL_SEARCH_MIN_CHARS = 3;
+const MODAL_SEARCH_MIN_CHARS = 2;
 const MODAL_SEARCH_DEBOUNCE_MS = 250;
 
 interface SalesPageProps {
@@ -24,6 +25,8 @@ interface CartItem {
   product: SaleProduct;
   quantity: number;
 }
+
+type SalesModalMode = 'create' | 'edit';
 
 function buildVisiblePages(currentPage: number, totalPages: number): number[] {
   if (totalPages <= 5) {
@@ -50,6 +53,10 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
   const [sales, setSales] = useState<SaleSummary[]>([]);
   const [page, setPage] = useState(routeState.page);
   const [search, setSearch] = useState(routeState.q);
+  const [paymentFilter, setPaymentFilter] = useState<'' | 'cash' | 'card'>(
+    routeState.paymentMethod,
+  );
+  const [soldDateFilter, setSoldDateFilter] = useState(routeState.soldDate);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,6 +68,9 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
   const [isDetailOpen, setIsDetailOpen] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<SalesModalMode>('create');
+  const [editingSaleId, setEditingSaleId] = useState<number | null>(null);
+  const [isPreparingEdit, setIsPreparingEdit] = useState(false);
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [modalSearch, setModalSearch] = useState('');
@@ -72,16 +82,24 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
   useEffect(() => {
     setPage((current) => (current === routeState.page ? current : routeState.page));
     setSearch((current) => (current === routeState.q ? current : routeState.q));
-  }, [routeState.page, routeState.q]);
+    setPaymentFilter((current) =>
+      current === routeState.paymentMethod ? current : routeState.paymentMethod,
+    );
+    setSoldDateFilter((current) =>
+      current === routeState.soldDate ? current : routeState.soldDate,
+    );
+  }, [routeState.page, routeState.paymentMethod, routeState.q, routeState.soldDate]);
 
   const syncRoute = useCallback(
     (next: Partial<SalesRouteState>) => {
       onRouteStateChange({
         page: next.page ?? page,
         q: next.q ?? search,
+        paymentMethod: next.paymentMethod ?? paymentFilter,
+        soldDate: next.soldDate ?? soldDateFilter,
       });
     },
-    [onRouteStateChange, page, search],
+    [onRouteStateChange, page, paymentFilter, search, soldDateFilter],
   );
 
   const fetchSales = useCallback(async () => {
@@ -93,6 +111,8 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
         page,
         limit: DEFAULT_PAGE_SIZE,
         q: search || undefined,
+        paymentMethod: paymentFilter || undefined,
+        soldDate: soldDateFilter || undefined,
       });
 
       if (response.totalPages === 0 && page !== 1) {
@@ -118,7 +138,7 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
     } finally {
       setIsLoading(false);
     }
-  }, [page, search, syncRoute]);
+  }, [page, paymentFilter, search, soldDateFilter, syncRoute]);
 
   useEffect(() => {
     void fetchSales();
@@ -201,9 +221,11 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
     setIsDetailOpen(true);
   };
 
-  const handleOpenModal = () => {
+  const handleOpenCreateModal = () => {
     setErrorMessage(null);
     setSuccessMessage(null);
+    setModalMode('create');
+    setEditingSaleId(null);
     setPaymentMethod('cash');
     setModalSearch('');
     setModalProducts([]);
@@ -219,6 +241,59 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
     setModalSearch('');
     setModalProducts([]);
     setIsAutocompleteOpen(false);
+    setModalMode('create');
+    setEditingSaleId(null);
+    setIsPreparingEdit(false);
+  };
+
+  const handleOpenEditModal = async () => {
+    if (!selectedSale) {
+      setErrorMessage('Selecciona una venta para editar.');
+      return;
+    }
+
+    setIsPreparingEdit(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const productLookups = await Promise.all(
+        selectedSale.items.map(async (item) => {
+          const product = await productsApi.getById(item.productId).catch(() => null);
+          return {
+            item,
+            product,
+          };
+        }),
+      );
+
+      const nextCartItems: CartItem[] = productLookups.map(({ item, product }) => ({
+        quantity: item.quantity,
+        product: {
+          id: item.productId,
+          codebar: item.productCodebar,
+          name: item.productName,
+          brand: item.brandName,
+          salePrice: item.unitPrice,
+          stock: Math.max(product?.stock ?? 0, item.quantity),
+        },
+      }));
+
+      setModalMode('edit');
+      setEditingSaleId(selectedSale.id);
+      setPaymentMethod(selectedSale.paymentMethod);
+      setModalSearch('');
+      setModalProducts([]);
+      setIsAutocompleteOpen(false);
+      setCartItems(nextCartItems);
+      setIsModalOpen(true);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'No se pudo preparar la edicion.',
+      );
+    } finally {
+      setIsPreparingEdit(false);
+    }
   };
 
   const reservedByProduct = useMemo(() => {
@@ -301,23 +376,34 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
     setSuccessMessage(null);
 
     try {
-      const sale = await salesApi.create({
+      const payload = {
         items: cartItems.map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,
         })),
         paymentMethod,
         soldAt: new Date().toISOString(),
-      });
+      };
+
+      const sale =
+        modalMode === 'edit' && editingSaleId !== null
+          ? await salesApi.update(editingSaleId, payload)
+          : await salesApi.create(payload);
 
       setIsModalOpen(false);
       setCartItems([]);
       setModalSearch('');
       setModalProducts([]);
       setIsAutocompleteOpen(false);
+      setModalMode('create');
+      setEditingSaleId(null);
       setSelectedSaleId(sale.id);
       setIsDetailOpen(true);
-      setSuccessMessage(`Venta #${sale.id} registrada correctamente.`);
+      setSuccessMessage(
+        modalMode === 'edit'
+          ? `Venta #${sale.id} actualizada correctamente.`
+          : `Venta #${sale.id} registrada correctamente.`,
+      );
       window.dispatchEvent(new Event('inventory:changed'));
 
       if (page !== 1) {
@@ -328,6 +414,13 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
       }
     } catch (error) {
       if (error instanceof ApiClientError) {
+        if (error.statusCode === 404) {
+          setSelectedSaleId(null);
+          setSelectedSale(null);
+          setSuccessMessage('La venta ya no existe. La lista se actualizo.');
+          await fetchSales();
+          return;
+        }
         const detailsMessage =
           typeof error.details === 'object' &&
           error.details !== null &&
@@ -347,6 +440,48 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
     }
   };
 
+  const handleDeleteSale = async () => {
+    if (!selectedSale) {
+      setErrorMessage('Selecciona una venta para eliminar.');
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Deseas eliminar la venta #${selectedSale.id}?`,
+    );
+    if (!shouldDelete) return;
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+
+    try {
+      await salesApi.remove(selectedSale.id);
+      setSelectedSaleId(null);
+      setSelectedSale(null);
+      setSuccessMessage(`Venta #${selectedSale.id} eliminada.`);
+      window.dispatchEvent(new Event('inventory:changed'));
+      await fetchSales();
+    } catch (error) {
+      if (error instanceof ApiClientError) {
+        const detailsMessage =
+          typeof error.details === 'object' &&
+          error.details !== null &&
+          'message' in error.details &&
+          typeof (error.details as { message?: unknown }).message === 'string'
+            ? String((error.details as { message: string }).message)
+            : null;
+        setErrorMessage(detailsMessage ?? error.message);
+      } else {
+        setErrorMessage(
+          error instanceof Error ? error.message : 'No se pudo eliminar la venta.',
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const visiblePages = useMemo(() => buildVisiblePages(page, totalPages), [page, totalPages]);
   const rangeStart = totalItems === 0 ? 0 : (page - 1) * DEFAULT_PAGE_SIZE + 1;
   const rangeEnd = Math.min(page * DEFAULT_PAGE_SIZE, totalItems);
@@ -360,7 +495,7 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
             <span className="breadcrumb">Inicio / Ventas</span>
           </div>
           <div className="header-actions">
-            <button type="button" className="btn btn-primary" onClick={handleOpenModal}>
+            <button type="button" className="btn btn-primary" onClick={handleOpenCreateModal}>
               <span className="btn-icon">+</span>
               Nueva venta
             </button>
@@ -386,6 +521,43 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
                 }}
               />
             </div>
+            <div className="filter-item">
+              <label className="filter-label" htmlFor="sales-payment-filter">
+                Tipo de pago
+              </label>
+              <select
+                id="sales-payment-filter"
+                className="filter-select"
+                value={paymentFilter}
+                onChange={(event) => {
+                  const nextValue = event.target.value as '' | 'cash' | 'card';
+                  setPaymentFilter(nextValue);
+                  setPage(1);
+                  syncRoute({ paymentMethod: nextValue, page: 1 });
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="cash">Efectivo</option>
+                <option value="card">Tarjeta</option>
+              </select>
+            </div>
+            <div className="filter-item">
+              <label className="filter-label" htmlFor="sales-date-filter">
+                Fecha
+              </label>
+              <input
+                id="sales-date-filter"
+                type="date"
+                className="form-input"
+                value={soldDateFilter}
+                onChange={(event) => {
+                  const nextDate = event.target.value;
+                  setSoldDateFilter(nextDate);
+                  setPage(1);
+                  syncRoute({ soldDate: nextDate, page: 1 });
+                }}
+              />
+            </div>
           </div>
           <div className="filters-actions">
             <button
@@ -393,8 +565,10 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
               className="btn btn-ghost"
               onClick={() => {
                 setSearch('');
+                setPaymentFilter('');
+                setSoldDateFilter('');
                 setPage(1);
-                syncRoute({ q: '', page: 1 });
+                syncRoute({ q: '', paymentMethod: '', soldDate: '', page: 1 });
               }}
             >
               Limpiar
@@ -414,6 +588,7 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
               <tr>
                 <th className="table-cell table-cell--header">ID</th>
                 <th className="table-cell table-cell--header">Fecha</th>
+                <th className="table-cell table-cell--header">Tipo pago</th>
                 <th className="table-cell table-cell--header table-cell--right">Items</th>
                 <th className="table-cell table-cell--header table-cell--right">Total</th>
               </tr>
@@ -421,13 +596,13 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
             <tbody className="table-body">
               {isLoading ? (
                 <tr className="table-row">
-                  <td className="table-cell" colSpan={4}>
+                  <td className="table-cell" colSpan={5}>
                     Cargando ventas...
                   </td>
                 </tr>
               ) : sales.length === 0 ? (
                 <tr className="table-row">
-                  <td className="table-cell" colSpan={4}>
+                  <td className="table-cell" colSpan={5}>
                     No hay ventas para mostrar.
                   </td>
                 </tr>
@@ -449,6 +624,9 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
                     >
                       <td className="table-cell">#{sale.id}</td>
                       <td className="table-cell">{formatDateTime(sale.createdAt)}</td>
+                      <td className="table-cell">
+                        {sale.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}
+                      </td>
                       <td className="table-cell table-cell--right table-cell--number">
                         {sale.totalItems}
                       </td>
@@ -562,6 +740,12 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
                   <span className="stat-label">Items</span>
                   <span className="stat-value">{selectedSale.totalItems}</span>
                 </div>
+                <div className="stat-card">
+                  <span className="stat-label">Tipo de pago</span>
+                  <span className="stat-value">
+                    {selectedSale.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}
+                  </span>
+                </div>
               </div>
 
               <div className="detail-section">
@@ -598,13 +782,37 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
             </>
           )}
         </div>
+        <div className="panel-footer">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={!selectedSale || isPreparingEdit}
+            onClick={() => {
+              void handleOpenEditModal();
+            }}
+          >
+            {isPreparingEdit ? 'Preparando...' : 'Editar venta'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger-outline"
+            disabled={!selectedSale || isPreparingEdit}
+            onClick={() => {
+              void handleDeleteSale();
+            }}
+          >
+            Eliminar
+          </button>
+        </div>
       </aside>
 
       {isModalOpen ? (
         <div className="modal-overlay modal-overlay--visible" role="dialog" aria-modal="true">
           <div className="modal modal--large sales-create-modal">
             <div className="modal-header">
-              <h3 className="modal-title">Registrar nueva venta</h3>
+              <h3 className="modal-title">
+                {modalMode === 'edit' ? 'Editar venta' : 'Registrar nueva venta'}
+              </h3>
               <button type="button" className="modal-close" onClick={handleCloseModal}>
                 x
               </button>
@@ -657,13 +865,9 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
                       }}
                     />
 
-                    {isAutocompleteOpen ? (
+                    {isAutocompleteOpen && modalSearch.trim().length >= MODAL_SEARCH_MIN_CHARS ? (
                       <div className="sales-search-dropdown">
-                        {modalSearch.trim().length < MODAL_SEARCH_MIN_CHARS ? (
-                          <div className="sales-search-dropdown__empty">
-                            Escribe al menos 3 caracteres.
-                          </div>
-                        ) : isLoadingModalProducts ? (
+                        {isLoadingModalProducts ? (
                           <div className="sales-search-dropdown__empty">Buscando productos...</div>
                         ) : modalProducts.length === 0 ? (
                           <div className="sales-search-dropdown__empty">
@@ -803,7 +1007,13 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
                   className="btn btn-primary"
                   disabled={isSubmittingSale || cartItemsCount === 0}
                 >
-                  {isSubmittingSale ? 'Registrando...' : 'Registrar venta'}
+                  {isSubmittingSale
+                    ? modalMode === 'edit'
+                      ? 'Guardando...'
+                      : 'Registrando...'
+                    : modalMode === 'edit'
+                      ? 'Guardar cambios'
+                      : 'Registrar venta'}
                 </button>
               </div>
             </form>

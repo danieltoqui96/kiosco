@@ -9,6 +9,7 @@ import type {
   SaleDetail,
   SaleProduct,
   SaleSummary,
+  UpdateSale,
 } from './sales.schema.js';
 import type {
   SaleItemRowDB,
@@ -34,6 +35,11 @@ interface TransactionProductRow extends RowDataPacket {
   purchase_price: number;
   stock: number;
   is_active: number;
+}
+
+interface SaleItemQuantityRow extends RowDataPacket {
+  product_id: number;
+  quantity: number;
 }
 
 function formatDateTime(value: Date | string): string {
@@ -69,35 +75,190 @@ function normalizeItems(items: CreateSale['items']): NormalizedSaleItemInput[] {
 function buildSalesWhere(search?: string): {
   whereSql: string;
   whereParams: unknown[];
+} & {
+  andClauses: string[];
 } {
-  if (!search) return { whereSql: '', whereParams: [] };
+  const andClauses: string[] = [];
+  const whereParams: unknown[] = [];
 
-  const value = `%${search}%`;
-  return {
-    whereSql: `
-      WHERE (
-        CAST(s.id AS CHAR) LIKE ?
-        OR EXISTS (
-          SELECT 1
-          FROM sale_items si_search
-          WHERE si_search.sale_id = s.id
-          AND (
-            si_search.product_name LIKE ?
-            OR si_search.product_codebar LIKE ?
+  if (search) {
+    const value = `%${search}%`;
+    andClauses.push(
+      `
+        (
+          CAST(s.id AS CHAR) LIKE ?
+          OR EXISTS (
+            SELECT 1
+            FROM sale_items si_search
+            WHERE si_search.sale_id = s.id
+            AND (
+              si_search.product_name LIKE ?
+              OR si_search.product_codebar LIKE ?
+            )
           )
         )
-      )
-    `,
-    whereParams: [value, value, value],
+      `,
+    );
+    whereParams.push(value, value, value);
+  }
+
+  const whereSql = andClauses.length > 0 ? `WHERE ${andClauses.join(' AND ')}` : '';
+  return { whereSql, whereParams, andClauses };
+}
+
+function toPaymentMethod(
+  paymentMethod?: string,
+): 'cash' | 'card' | undefined {
+  if (paymentMethod === 'cash' || paymentMethod === 'card') {
+    return paymentMethod;
+  }
+  return undefined;
+}
+
+function toDateFilter(dateValue?: string): string | undefined {
+  if (!dateValue) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return undefined;
+  return dateValue;
+}
+
+function normalizeSoldAtInput(value?: string): Date {
+  const soldAt = value ? new Date(value) : new Date();
+  if (Number.isNaN(soldAt.getTime())) {
+    throw {
+      message: 'Fecha de venta invalida.',
+      statusCode: 400,
+    };
+  }
+  return soldAt;
+}
+
+function calculateSaleTotals(
+  items: NormalizedSaleItemInput[],
+  productsById: Map<number, TransactionProductRow>,
+) {
+  const itemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
+  const totalSale = items.reduce((acc, item) => {
+    const product = productsById.get(item.productId);
+    if (!product) return acc;
+    return acc + item.quantity * product.sale_price;
+  }, 0);
+  const totalCost = items.reduce((acc, item) => {
+    const product = productsById.get(item.productId);
+    if (!product) return acc;
+    return acc + item.quantity * product.purchase_price;
+  }, 0);
+  const profit = totalSale - totalCost;
+
+  return {
+    itemsCount,
+    totalSale,
+    totalCost,
+    profit,
   };
+}
+
+async function insertSaleItemsAndApplyStock(
+  connection: Awaited<ReturnType<typeof pool.getConnection>>,
+  saleId: number,
+  items: NormalizedSaleItemInput[],
+  productsById: Map<number, TransactionProductRow>,
+): Promise<void> {
+  for (const item of items) {
+    const product = productsById.get(item.productId);
+    if (!product) continue;
+
+    const lineSaleTotal = item.quantity * product.sale_price;
+    const lineCostTotal = item.quantity * product.purchase_price;
+
+    await connection.query<ResultSetHeader>(
+      `
+        INSERT INTO sale_items (
+          sale_id,
+          product_id,
+          product_codebar,
+          product_name,
+          brand_name,
+          quantity,
+          unit_price,
+          unit_sale_price,
+          unit_purchase_price,
+          line_sale_total,
+          line_cost_total
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        saleId,
+        product.id,
+        product.codebar,
+        product.name,
+        product.brand,
+        item.quantity,
+        product.sale_price,
+        product.sale_price,
+        product.purchase_price,
+        lineSaleTotal,
+        lineCostTotal,
+      ],
+    );
+  }
+}
+
+async function updateProductStockForSaleUpdate(
+  connection: Awaited<ReturnType<typeof pool.getConnection>>,
+  productRows: TransactionProductRow[],
+  previousQuantities: Map<number, number>,
+  nextQuantities: Map<number, number>,
+): Promise<void> {
+  for (const product of productRows) {
+    const previousQuantity = previousQuantities.get(product.id) ?? 0;
+    const nextQuantity = nextQuantities.get(product.id) ?? 0;
+    const nextStock = product.stock + previousQuantity - nextQuantity;
+
+    if (nextStock < 0) {
+      throw {
+        message: `Stock insuficiente para "${product.name}". Disponible: ${product.stock + previousQuantity}.`,
+        statusCode: 409,
+      };
+    }
+
+    await connection.query<ResultSetHeader>(
+      `
+        UPDATE products
+        SET stock = ?
+        WHERE id = ?
+      `,
+      [nextStock, product.id],
+    );
+  }
 }
 
 export class SalesModel {
   static async getAllSales(
     pagination: PaginationParams,
     search?: string,
+    paymentMethod?: string,
+    soldDate?: string,
   ): Promise<PaginatedResult<SaleSummary>> {
-    const { whereSql, whereParams } = buildSalesWhere(search);
+    const whereData = buildSalesWhere(search);
+    const normalizedPaymentMethod = toPaymentMethod(paymentMethod);
+    const normalizedDate = toDateFilter(soldDate);
+
+    if (normalizedPaymentMethod) {
+      whereData.andClauses.push('COALESCE(s.payment_method, \'cash\') = ?');
+      whereData.whereParams.push(normalizedPaymentMethod);
+    }
+
+    if (normalizedDate) {
+      whereData.andClauses.push('DATE(s.sold_at) = ?');
+      whereData.whereParams.push(normalizedDate);
+    }
+
+    const whereSql =
+      whereData.andClauses.length > 0
+        ? `WHERE ${whereData.andClauses.join(' AND ')}`
+        : '';
+    const whereParams = whereData.whereParams;
 
     const [countRows] = await pool.query<CountRow[]>(
       `
@@ -301,25 +462,11 @@ export class SalesModel {
         }
       });
 
-      const itemsCount = normalizedItems.reduce((acc, item) => acc + item.quantity, 0);
-      const totalSale = normalizedItems.reduce((acc, item) => {
-        const product = productsById.get(item.productId);
-        if (!product) return acc;
-        return acc + item.quantity * product.sale_price;
-      }, 0);
-      const totalCost = normalizedItems.reduce((acc, item) => {
-        const product = productsById.get(item.productId);
-        if (!product) return acc;
-        return acc + item.quantity * product.purchase_price;
-      }, 0);
-      const profit = totalSale - totalCost;
-      const soldAt = data.soldAt ? new Date(data.soldAt) : new Date();
-      if (Number.isNaN(soldAt.getTime())) {
-        throw {
-          message: 'Fecha de venta invalida.',
-          statusCode: 400,
-        };
-      }
+      const { itemsCount, totalSale, totalCost, profit } = calculateSaleTotals(
+        normalizedItems,
+        productsById,
+      );
+      const soldAt = normalizeSoldAtInput(data.soldAt);
 
       const [saleInsert] = await connection.query<ResultSetHeader>(
         `
@@ -331,48 +478,16 @@ export class SalesModel {
 
       const saleId = saleInsert.insertId;
 
+      await insertSaleItemsAndApplyStock(connection, saleId, normalizedItems, productsById);
+
       for (const item of normalizedItems) {
-        const product = productsById.get(item.productId);
-        if (!product) continue;
-
-        const lineSaleTotal = item.quantity * product.sale_price;
-        const lineCostTotal = item.quantity * product.purchase_price;
-
-        await connection.query<ResultSetHeader>(
-          `
-            INSERT INTO sale_items (
-              sale_id,
-              product_id,
-              product_codebar,
-              product_name,
-              quantity,
-              unit_sale_price,
-              unit_purchase_price,
-              line_sale_total,
-              line_cost_total
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `,
-          [
-            saleId,
-            product.id,
-            product.codebar,
-            product.name,
-            item.quantity,
-            product.sale_price,
-            product.purchase_price,
-            lineSaleTotal,
-            lineCostTotal,
-          ],
-        );
-
         await connection.query<ResultSetHeader>(
           `
             UPDATE products
             SET stock = stock - ?
             WHERE id = ?
           `,
-          [item.quantity, product.id],
+          [item.quantity, item.productId],
         );
       }
 
@@ -387,6 +502,257 @@ export class SalesModel {
       }
 
       return sale;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async updateSale(id: number, data: UpdateSale): Promise<SaleDetail | null> {
+    const normalizedItems = normalizeItems(data.items);
+    const nextQuantities = new Map<number, number>(
+      normalizedItems.map((item) => [item.productId, item.quantity]),
+    );
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [saleRows] = await connection.query<RowDataPacket[]>(
+        `
+          SELECT id
+          FROM sales
+          WHERE id = ?
+          FOR UPDATE
+        `,
+        [id],
+      );
+      if (saleRows.length === 0) {
+        await connection.rollback();
+        return null;
+      }
+
+      const [previousRows] = await connection.query<SaleItemQuantityRow[]>(
+        `
+          SELECT product_id, SUM(quantity) AS quantity
+          FROM sale_items
+          WHERE sale_id = ?
+          GROUP BY product_id
+        `,
+        [id],
+      );
+      const previousQuantities = new Map<number, number>(
+        previousRows.map((row) => [row.product_id, Number(row.quantity)]),
+      );
+
+      const productIds = Array.from(
+        new Set([...previousQuantities.keys(), ...nextQuantities.keys()]),
+      );
+
+      if (productIds.length === 0) {
+        throw {
+          message: 'La venta debe contener al menos un producto.',
+          statusCode: 400,
+        };
+      }
+
+      const placeholders = productIds.map(() => '?').join(', ');
+      const [productRows] = await connection.query<TransactionProductRow[]>(
+        `
+          SELECT
+            p.id,
+            p.codebar,
+            p.name,
+            b.name AS brand,
+            p.sale_price,
+            p.purchase_price,
+            p.stock,
+            p.is_active
+          FROM products p
+          INNER JOIN brands b ON b.id = p.brand_id
+          WHERE p.id IN (${placeholders})
+          FOR UPDATE
+        `,
+        productIds,
+      );
+
+      const productsById = new Map(productRows.map((row) => [row.id, row]));
+
+      normalizedItems.forEach((item) => {
+        const product = productsById.get(item.productId);
+        if (!product) {
+          throw {
+            message: `Producto ${item.productId} no encontrado.`,
+            statusCode: 404,
+          };
+        }
+        if (product.is_active !== 1) {
+          throw {
+            message: `El producto "${product.name}" esta inactivo.`,
+            statusCode: 409,
+          };
+        }
+      });
+
+      await updateProductStockForSaleUpdate(
+        connection,
+        productRows,
+        previousQuantities,
+        nextQuantities,
+      );
+
+      await connection.query<ResultSetHeader>(
+        `
+          DELETE FROM sale_items
+          WHERE sale_id = ?
+        `,
+        [id],
+      );
+
+      await insertSaleItemsAndApplyStock(connection, id, normalizedItems, productsById);
+
+      const { itemsCount, totalSale, totalCost, profit } = calculateSaleTotals(
+        normalizedItems,
+        productsById,
+      );
+      const soldAt = normalizeSoldAtInput(data.soldAt);
+
+      await connection.query<ResultSetHeader>(
+        `
+          UPDATE sales
+          SET
+            sold_at = ?,
+            created_at = ?,
+            payment_method = ?,
+            items_count = ?,
+            total_sale = ?,
+            total_cost = ?,
+            profit = ?
+          WHERE id = ?
+        `,
+        [
+          soldAt,
+          soldAt,
+          data.paymentMethod,
+          itemsCount,
+          totalSale,
+          totalCost,
+          profit,
+          id,
+        ],
+      );
+
+      await connection.commit();
+
+      const sale = await this.getSaleById(id);
+      if (!sale) {
+        throw {
+          message: 'Venta actualizada pero no se pudo recuperar.',
+          statusCode: 500,
+        };
+      }
+
+      return sale;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async deleteSale(id: number): Promise<SaleDetail | null> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [saleRows] = await connection.query<RowDataPacket[]>(
+        `
+          SELECT id
+          FROM sales
+          WHERE id = ?
+          FOR UPDATE
+        `,
+        [id],
+      );
+      if (saleRows.length === 0) {
+        await connection.rollback();
+        return null;
+      }
+
+      const saleBeforeDelete = await this.getSaleById(id);
+      if (!saleBeforeDelete) {
+        await connection.rollback();
+        return null;
+      }
+
+      const [previousRows] = await connection.query<SaleItemQuantityRow[]>(
+        `
+          SELECT product_id, SUM(quantity) AS quantity
+          FROM sale_items
+          WHERE sale_id = ?
+          GROUP BY product_id
+        `,
+        [id],
+      );
+
+      const productIds = previousRows.map((row) => row.product_id);
+      if (productIds.length > 0) {
+        const placeholders = productIds.map(() => '?').join(', ');
+        const [productRows] = await connection.query<TransactionProductRow[]>(
+          `
+            SELECT
+              p.id,
+              p.codebar,
+              p.name,
+              b.name AS brand,
+              p.sale_price,
+              p.purchase_price,
+              p.stock,
+              p.is_active
+            FROM products p
+            INNER JOIN brands b ON b.id = p.brand_id
+            WHERE p.id IN (${placeholders})
+            FOR UPDATE
+          `,
+          productIds,
+        );
+
+        const stockById = new Map(productRows.map((row) => [row.id, row.stock]));
+        for (const row of previousRows) {
+          const currentStock = stockById.get(row.product_id);
+          if (currentStock === undefined) continue;
+          await connection.query<ResultSetHeader>(
+            `
+              UPDATE products
+              SET stock = ?
+              WHERE id = ?
+            `,
+            [currentStock + Number(row.quantity), row.product_id],
+          );
+        }
+      }
+
+      await connection.query<ResultSetHeader>(
+        `
+          DELETE FROM sale_items
+          WHERE sale_id = ?
+        `,
+        [id],
+      );
+
+      await connection.query<ResultSetHeader>(
+        `
+          DELETE FROM sales
+          WHERE id = ?
+        `,
+        [id],
+      );
+
+      await connection.commit();
+      return saleBeforeDelete;
     } catch (error) {
       await connection.rollback();
       throw error;
