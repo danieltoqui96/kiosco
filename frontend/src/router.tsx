@@ -7,11 +7,14 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/react-router';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { Home } from './pages/Home';
-import type { ProductRouteState } from './components/layout/MainLayout';
+import type {
+  ProductRouteState,
+  SalesRouteState,
+} from './components/layout/MainLayout';
 
-interface RouterSearchState {
+interface ProductRouterSearchState {
   page?: number;
   search?: string;
   brand?: string;
@@ -20,18 +23,18 @@ interface RouterSearchState {
   codebar?: string;
 }
 
-const defaultProductsSearch: RouterSearchState = {
+interface SalesRouterSearchState {
+  page?: number;
+  q?: string;
+}
+
+const defaultProductsSearch: ProductRouterSearchState = {
   page: 1,
 };
 
-const PRODUCT_QUERY_KEYS = new Set([
-  'page',
-  'search',
-  'brand',
-  'category',
-  'status',
-  'codebar',
-]);
+const defaultSalesSearch: SalesRouterSearchState = {
+  page: 1,
+};
 
 function parsePage(rawValue: unknown): number {
   const parsedValue =
@@ -55,7 +58,9 @@ function parseStatus(rawValue: unknown): 'true' | 'false' | undefined {
   return undefined;
 }
 
-function normalizeSearchState(search: Record<string, unknown>): RouterSearchState {
+function normalizeProductsSearch(
+  search: Record<string, unknown>,
+): ProductRouterSearchState {
   return {
     page: parsePage(search.page),
     search: parseOptionalText(search.search),
@@ -66,56 +71,11 @@ function normalizeSearchState(search: Record<string, unknown>): RouterSearchStat
   };
 }
 
-function sanitizeProductsSearch(search: RouterSearchState): RouterSearchState {
+function normalizeSalesSearch(search: Record<string, unknown>): SalesRouterSearchState {
   return {
     page: parsePage(search.page),
-    search: search.search,
-    brand: search.brand,
-    category: search.category,
-    status: search.status,
-    codebar: search.codebar,
+    q: parseOptionalText(search.q),
   };
-}
-
-function isSameSearchState(left: RouterSearchState, right: RouterSearchState): boolean {
-  return (
-    left.page === right.page &&
-    left.search === right.search &&
-    left.brand === right.brand &&
-    left.category === right.category &&
-    left.status === right.status &&
-    left.codebar === right.codebar
-  );
-}
-
-function isQueryCanonical(search: RouterSearchState): boolean {
-  if (typeof window === 'undefined') return true;
-
-  const params = new URLSearchParams(window.location.search);
-  for (const key of params.keys()) {
-    if (!PRODUCT_QUERY_KEYS.has(key)) return false;
-    if (params.getAll(key).length > 1) return false;
-  }
-
-  const expected: Record<string, string | undefined> = {
-    page: String(parsePage(search.page)),
-    search: search.search,
-    brand: search.brand,
-    category: search.category,
-    status: search.status,
-    codebar: search.codebar,
-  };
-
-  for (const [key, expectedValue] of Object.entries(expected)) {
-    const actualValue = params.get(key);
-    if (expectedValue === undefined) {
-      if (actualValue !== null) return false;
-    } else if (actualValue !== expectedValue) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 const rootRoute = createRootRoute({
@@ -136,88 +96,147 @@ const indexRoute = createRoute({
 const productsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'productos',
-  validateSearch: (search: Record<string, unknown>): RouterSearchState =>
-    normalizeSearchState(search),
+  validateSearch: (search: Record<string, unknown>): ProductRouterSearchState =>
+    normalizeProductsSearch(search),
   component: ProductsView,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, productsRoute]);
+const salesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'ventas',
+  validateSearch: (search: Record<string, unknown>): SalesRouterSearchState =>
+    normalizeSalesSearch(search),
+  component: SalesView,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, productsRoute, salesRoute]);
 
 export const router = createRouter({ routeTree });
 
 function ProductsView() {
   const navigate = useNavigate({ from: productsRoute.fullPath });
-  const rawSearch = productsRoute.useSearch();
-  const currentSearch = sanitizeProductsSearch(rawSearch);
-  const queryIsCanonical = isQueryCanonical(currentSearch);
-
-  useEffect(() => {
-    if (queryIsCanonical) return;
-    void navigate({
-      to: '/productos',
-      search: currentSearch,
-      replace: true,
-    });
-  }, [currentSearch, navigate, queryIsCanonical]);
-
-  const updateSearch = useCallback(
-    (patch: Partial<RouterSearchState>) => {
-      const merged = sanitizeProductsSearch({ ...currentSearch, ...patch });
-      if (isSameSearchState(currentSearch, merged)) return;
-      void navigate({
-        to: '/productos',
-        search: merged,
-        replace: true,
-      });
-    },
-    [currentSearch, navigate],
-  );
+  const search = productsRoute.useSearch();
 
   const productRouteState: ProductRouteState = {
-    page: parsePage(currentSearch.page),
-    search: currentSearch.search ?? '',
-    brand: currentSearch.brand ?? '',
-    category: currentSearch.category ?? '',
-    status: currentSearch.status ?? '',
-    codebar: currentSearch.codebar ?? '',
+    page: parsePage(search.page),
+    search: search.search ?? '',
+    brand: search.brand ?? '',
+    category: search.category ?? '',
+    status: search.status ?? '',
+    codebar: search.codebar ?? '',
+  };
+
+  const salesRouteState: SalesRouteState = {
+    page: 1,
+    q: '',
   };
 
   const handleProductRouteStateChange = useCallback(
     (next: Partial<ProductRouteState>) => {
-      updateSearch({
-        page:
-          next.page === undefined
-            ? parsePage(currentSearch.page)
-            : Math.max(1, Math.floor(next.page)),
-        search:
-          next.search === undefined
-            ? currentSearch.search
-            : parseOptionalText(next.search),
-        brand:
-          next.brand === undefined
-            ? currentSearch.brand
-            : parseOptionalText(next.brand),
-        category:
-          next.category === undefined
-            ? currentSearch.category
-            : parseOptionalText(next.category),
-        status:
-          next.status === undefined
-            ? currentSearch.status
-            : parseStatus(next.status),
-        codebar:
-          next.codebar === undefined
-            ? currentSearch.codebar
-            : parseOptionalText(next.codebar),
+      void navigate({
+        to: '/productos',
+        search: {
+          page:
+            next.page === undefined
+              ? productRouteState.page
+              : Math.max(1, Math.floor(next.page)),
+          search:
+            next.search === undefined
+              ? parseOptionalText(productRouteState.search)
+              : parseOptionalText(next.search),
+          brand:
+            next.brand === undefined
+              ? parseOptionalText(productRouteState.brand)
+              : parseOptionalText(next.brand),
+          category:
+            next.category === undefined
+              ? parseOptionalText(productRouteState.category)
+              : parseOptionalText(next.category),
+          status:
+            next.status === undefined
+              ? parseStatus(productRouteState.status)
+              : parseStatus(next.status),
+          codebar:
+            next.codebar === undefined
+              ? parseOptionalText(productRouteState.codebar)
+              : parseOptionalText(next.codebar),
+        },
+        replace: true,
       });
     },
-    [currentSearch, updateSearch],
+    [navigate, productRouteState],
   );
 
   return (
     <Home
+      section="products"
       productRouteState={productRouteState}
       onProductRouteStateChange={handleProductRouteStateChange}
+      salesRouteState={salesRouteState}
+      onSalesRouteStateChange={() => {}}
+      onGoToProducts={() => {}}
+      onGoToSales={() => {
+        void navigate({
+          to: '/ventas',
+          search: defaultSalesSearch,
+        });
+      }}
+    />
+  );
+}
+
+function SalesView() {
+  const navigate = useNavigate({ from: salesRoute.fullPath });
+  const search = salesRoute.useSearch();
+
+  const salesRouteState: SalesRouteState = {
+    page: parsePage(search.page),
+    q: search.q ?? '',
+  };
+
+  const productRouteState: ProductRouteState = {
+    page: 1,
+    search: '',
+    brand: '',
+    category: '',
+    status: '',
+    codebar: '',
+  };
+
+  const handleSalesRouteStateChange = useCallback(
+    (next: Partial<SalesRouteState>) => {
+      void navigate({
+        to: '/ventas',
+        search: {
+          page:
+            next.page === undefined
+              ? salesRouteState.page
+              : Math.max(1, Math.floor(next.page)),
+          q:
+            next.q === undefined
+              ? parseOptionalText(salesRouteState.q)
+              : parseOptionalText(next.q),
+        },
+        replace: true,
+      });
+    },
+    [navigate, salesRouteState],
+  );
+
+  return (
+    <Home
+      section="sales"
+      productRouteState={productRouteState}
+      onProductRouteStateChange={() => {}}
+      salesRouteState={salesRouteState}
+      onSalesRouteStateChange={handleSalesRouteStateChange}
+      onGoToProducts={() => {
+        void navigate({
+          to: '/productos',
+          search: defaultProductsSearch,
+        });
+      }}
+      onGoToSales={() => {}}
     />
   );
 }
