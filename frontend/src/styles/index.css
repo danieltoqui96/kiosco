@@ -157,14 +157,16 @@ body {
     var(--color-primary-700)
   );
   color: white;
-  font-weight: 700;
-  font-size: 1rem;
   width: 40px;
   height: 40px;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.sidebar-logo svg {
+  display: block;
 }
 
 .sidebar-title {
@@ -200,13 +202,85 @@ body {
 }
 
 .nav-icon {
-  font-size: 1.25rem;
   width: 24px;
-  text-align: center;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-icon svg {
+  display: block;
 }
 
 .nav-label {
   font-size: 0.9375rem;
+}
+
+.sidebar-cash-summary {
+  margin: var(--space-md);
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(15, 23, 42, 0.18)),
+    rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-cash-summary__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: 6px;
+}
+
+.sidebar-cash-summary__eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-gray-300);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-cash-summary__status {
+  color: var(--color-primary-300);
+  font-size: 0.625rem;
+  font-weight: 650;
+}
+
+.sidebar-cash-summary__total {
+  color: var(--text-inverse);
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-weight: 750;
+  line-height: 1.2;
+  margin-bottom: 10px;
+}
+
+.sidebar-cash-summary__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.sidebar-cash-summary__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-gray-300);
+  font-size: 0.75rem;
+}
+
+.sidebar-cash-summary__item strong {
+  color: var(--text-inverse);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: right;
 }
 
 .sidebar-footer {

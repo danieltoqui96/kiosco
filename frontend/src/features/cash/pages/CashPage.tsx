@@ -317,6 +317,7 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
       setDepositAmount('');
       setDepositPaymentMethod('cash');
       setSuccessMessage(`Ingreso registrado para ${formatDay(selectedDay)}.`);
+      window.dispatchEvent(new Event('cash:changed'));
       await fetchSummary();
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -350,6 +351,7 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
       setWithdrawAmount('');
       setWithdrawPaymentMethod('cash');
       setSuccessMessage(`Retiro registrado para ${formatDay(selectedDay)}.`);
+      window.dispatchEvent(new Event('cash:changed'));
       await fetchSummary();
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
