@@ -1,7 +1,11 @@
 import { z } from 'zod';
 
 const baseCategorySchema = z.object({
-  name: z.string().min(1).max(100),
+  name: z
+    .string()
+    .min(1)
+    .max(100)
+    .transform((value) => value.trim().toUpperCase()),
 });
 
 export const categorySchema = baseCategorySchema.extend({

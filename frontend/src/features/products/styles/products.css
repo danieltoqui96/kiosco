@@ -39,6 +39,17 @@
   font-size: 0.875rem;
 }
 
+.main-content input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.main-content input[type='number']::-webkit-inner-spin-button,
+.main-content input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .sidebar .nav-item {
   width: 100%;
   border: none;
@@ -124,6 +135,273 @@
 .detail-section--first {
   border-top: none;
   padding-top: 0;
+}
+
+.detail-summary-card {
+  border: 1px solid var(--border-light);
+  background: var(--bg-hover);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-summary-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-summary-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-summary-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.detail-summary-pill {
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--color-gray-100);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.detail-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.detail-summary-item {
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detail-summary-label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.detail-summary-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-compact-table .table-cell {
+  padding: 10px 12px;
+  font-size: 0.8125rem;
+}
+
+.app-compact-table .table-cell--header {
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+}
+
+.app-compact-table .table-pagination {
+  padding: 10px 12px;
+}
+
+.sales-table .data-table,
+.cash-table .data-table {
+  table-layout: fixed;
+}
+
+.sales-table__id {
+  width: 12%;
+}
+
+.sales-table__date {
+  width: 34%;
+}
+
+.sales-table__payment {
+  width: 18%;
+}
+
+.sales-table__items {
+  width: 12%;
+}
+
+.sales-table__total {
+  width: 24%;
+}
+
+.cash-table__day {
+  width: 27%;
+}
+
+.cash-table__sales,
+.cash-table__items {
+  width: 10%;
+}
+
+.cash-table__cash,
+.cash-table__card,
+.cash-table__total {
+  width: 17.66%;
+}
+
+.payment-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.payment-badge--cash {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.payment-badge--card {
+  background-color: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.products-table .data-table {
+  table-layout: fixed;
+}
+
+.products-table__code {
+  width: 15%;
+}
+
+.products-table__product {
+  width: 24%;
+}
+
+.products-table__brand {
+  width: 15%;
+}
+
+.products-table__category {
+  width: 15%;
+}
+
+.products-table__price {
+  width: 12%;
+}
+
+.products-table__stock {
+  width: 10%;
+}
+
+.products-table__state {
+  width: 9%;
+}
+
+.products-table .table-cell--code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.products-table .product-cell {
+  gap: 0;
+  min-width: 0;
+}
+
+.products-table .product-info {
+  min-width: 0;
+}
+
+.products-table .product-name,
+.products-table__text,
+.products-table .category-badge {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.products-table .product-name {
+  font-weight: 650;
+}
+
+.products-table .category-badge,
+.products-table .status-badge,
+.products-table .stock-indicator {
+  max-width: 100%;
+  padding: 4px 7px;
+  font-size: 0.6875rem;
+}
+
+.products-table__stock-stack {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 48px;
+}
+
+.products-table__stock-stack strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.products-table__stock-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.products-table__stock-dot--low {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.products-table__stock-dot--zero {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.products-table__stock-dot--empty {
+  visibility: hidden;
 }
 
 .sales-edit-item-row {
@@ -240,6 +518,50 @@
   margin: 0;
 }
 
+.date-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.date-cell--time-only {
+  justify-content: center;
+}
+
+.date-cell__day {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.date-cell__time {
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.date-cell--compact {
+  gap: 6px;
+}
+
+.date-cell--compact .date-cell__day {
+  font-size: 0.8125rem;
+}
+
+.date-cell--compact .date-cell__time {
+  font-size: 0.6875rem;
+  padding: 3px 6px;
+}
+
 .sales-search-field {
   position: relative;
 }
@@ -332,6 +654,64 @@
   height: 38px;
 }
 
+.sales-detail-items-table {
+  border-radius: var(--radius-md);
+}
+
+.sales-detail-items-table .data-table {
+  table-layout: fixed;
+}
+
+.sales-detail-items-table__code {
+  width: 22%;
+}
+
+.sales-detail-items-table__product {
+  width: 28%;
+}
+
+.sales-detail-items-table__brand {
+  width: 19%;
+}
+
+.sales-detail-items-table__qty {
+  width: 10%;
+}
+
+.sales-detail-items-table__price {
+  width: 21%;
+}
+
+.sales-detail-items-table .table-cell {
+  padding: 9px 7px;
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.sales-detail-items-table .table-cell--header {
+  font-size: 0.625rem;
+  letter-spacing: 0.035em;
+}
+
+.sales-detail-items-table .table-cell--code {
+  font-size: 0.6875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sales-detail-items-table .table-cell--number {
+  white-space: nowrap;
+}
+
+.sales-detail-items-table__text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sales-qty-controls {
   display: inline-flex;
   gap: 4px;
@@ -402,71 +782,4 @@
 .cash-icon-badge--type {
   background-color: var(--color-gray-100);
   color: var(--text-secondary);
-}
-
-.cash-detail-overview {
-  border: 1px solid var(--border-light);
-  background: var(--bg-hover);
-  border-radius: var(--radius-md);
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.cash-detail-head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.cash-detail-day {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  margin: 0;
-}
-
-.cash-mini-metrics {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.cash-mini-pill {
-  font-size: 0.75rem;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--color-gray-100);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.cash-balance-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.cash-balance-item {
-  border: 1px solid var(--border-light);
-  background: var(--bg-card);
-  border-radius: var(--radius-sm);
-  padding: 6px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.cash-balance-label {
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-
-.cash-balance-value {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-primary);
 }

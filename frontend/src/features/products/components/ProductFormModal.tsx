@@ -1,4 +1,11 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
 import type { ProductFormValues } from '../types';
 
 interface ProductFormModalProps {
@@ -20,6 +27,12 @@ interface ProductFormErrors {
   stock?: string;
 }
 
+interface ProductFormTextValues {
+  salePrice: string;
+  purchasePrice: string;
+  stock: string;
+}
+
 const DEFAULT_VALUES: ProductFormValues = {
   codebar: '',
   name: '',
@@ -31,6 +44,34 @@ const DEFAULT_VALUES: ProductFormValues = {
   isActive: true,
 };
 
+function toNumericTextValues(values: ProductFormValues): ProductFormTextValues {
+  return {
+    salePrice: values.salePrice === 0 ? '' : formatNumberInput(values.salePrice),
+    purchasePrice:
+      values.purchasePrice === 0 ? '' : formatNumberInput(values.purchasePrice),
+    stock: values.stock === 0 ? '' : formatNumberInput(values.stock),
+  };
+}
+
+function parseNumberInput(value: string): number {
+  const normalizedValue = value.replace(/\./g, '').trim();
+  if (normalizedValue.length === 0) return 0;
+  const parsed = Number(normalizedValue);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function formatNumberInput(value: number): string {
+  return new Intl.NumberFormat('es-CL', {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function normalizeNumberInput(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 0) return '';
+  return formatNumberInput(Number(digits));
+}
+
 function sanitizeValues(
   values: ProductFormValues | null | undefined,
 ): ProductFormValues {
@@ -38,9 +79,9 @@ function sanitizeValues(
   return {
     ...values,
     codebar: values.codebar.trim(),
-    name: values.name.trim(),
-    brand: values.brand.trim(),
-    category: values.category.trim(),
+    name: values.name.trim().toUpperCase(),
+    brand: values.brand.trim().toUpperCase(),
+    category: values.category.trim().toUpperCase(),
   };
 }
 
@@ -76,10 +117,22 @@ export const ProductFormModal = ({
   onClose,
   onSubmit,
 }: ProductFormModalProps) => {
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [values, setValues] = useState<ProductFormValues>(() =>
     getInitialFormValues(initialValues),
   );
+  const [numericTexts, setNumericTexts] = useState<ProductFormTextValues>(() =>
+    toNumericTextValues(getInitialFormValues(initialValues)),
+  );
   const [errors, setErrors] = useState<ProductFormErrors>({});
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const nextValues = getInitialFormValues(initialValues);
+    setValues(nextValues);
+    setNumericTexts(toNumericTextValues(nextValues));
+    setErrors({});
+  }, [initialValues, isOpen]);
 
   const title = useMemo(
     () => (mode === 'create' ? 'Agregar producto' : 'Editar producto'),
@@ -90,10 +143,27 @@ export const ProductFormModal = ({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const nextErrors = validate(values);
+    const nextValues = {
+      ...values,
+      salePrice: parseNumberInput(numericTexts.salePrice),
+      purchasePrice: parseNumberInput(numericTexts.purchasePrice),
+      stock: parseNumberInput(numericTexts.stock),
+    };
+    const nextErrors = validate(nextValues);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    onSubmit(sanitizeValues(values));
+    onSubmit(sanitizeValues(nextValues));
+  };
+
+  const handleFormKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.key !== 'Enter') return;
+    if (!(event.target instanceof HTMLInputElement)) return;
+
+    event.preventDefault();
+
+    if (event.target.id === 'product-codebar') {
+      nameInputRef.current?.focus();
+    }
   };
 
   return (
@@ -106,7 +176,7 @@ export const ProductFormModal = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown}>
           <div className="modal-content">
             <fieldset className="form-section">
               <legend className="form-section-title">Informacion general</legend>
@@ -132,10 +202,14 @@ export const ProductFormModal = ({
                   </label>
                   <input
                     id="product-name"
+                    ref={nameInputRef}
                     className="form-input"
                     value={values.name}
                     onChange={(event) =>
-                      setValues((prev) => ({ ...prev, name: event.target.value }))
+                      setValues((prev) => ({
+                        ...prev,
+                        name: event.target.value.toUpperCase(),
+                      }))
                     }
                   />
                   {errors.name ? <span className="form-error">{errors.name}</span> : null}
@@ -150,7 +224,10 @@ export const ProductFormModal = ({
                     className="form-input"
                     value={values.brand}
                     onChange={(event) =>
-                      setValues((prev) => ({ ...prev, brand: event.target.value }))
+                      setValues((prev) => ({
+                        ...prev,
+                        brand: event.target.value.toUpperCase(),
+                      }))
                     }
                   />
                   {errors.brand ? <span className="form-error">{errors.brand}</span> : null}
@@ -168,7 +245,10 @@ export const ProductFormModal = ({
                     className="form-input"
                     value={values.category}
                     onChange={(event) =>
-                      setValues((prev) => ({ ...prev, category: event.target.value }))
+                      setValues((prev) => ({
+                        ...prev,
+                        category: event.target.value.toUpperCase(),
+                      }))
                     }
                   />
                   {errors.category ? (
@@ -190,16 +270,18 @@ export const ProductFormModal = ({
                   </label>
                   <input
                     id="product-sale-price"
+                    type="text"
                     className="form-input"
-                    type="number"
-                    min={0}
-                    value={values.salePrice}
-                    onChange={(event) =>
+                    inputMode="numeric"
+                    value={numericTexts.salePrice}
+                    onChange={(event) => {
+                      const nextValue = normalizeNumberInput(event.target.value);
+                      setNumericTexts((prev) => ({ ...prev, salePrice: nextValue }));
                       setValues((prev) => ({
                         ...prev,
-                        salePrice: Number(event.target.value || 0),
-                      }))
-                    }
+                        salePrice: parseNumberInput(nextValue),
+                      }));
+                    }}
                   />
                   {errors.salePrice ? (
                     <span className="form-error">{errors.salePrice}</span>
@@ -217,16 +299,18 @@ export const ProductFormModal = ({
                   </label>
                   <input
                     id="product-purchase-price"
+                    type="text"
                     className="form-input"
-                    type="number"
-                    min={0}
-                    value={values.purchasePrice}
-                    onChange={(event) =>
+                    inputMode="numeric"
+                    value={numericTexts.purchasePrice}
+                    onChange={(event) => {
+                      const nextValue = normalizeNumberInput(event.target.value);
+                      setNumericTexts((prev) => ({ ...prev, purchasePrice: nextValue }));
                       setValues((prev) => ({
                         ...prev,
-                        purchasePrice: Number(event.target.value || 0),
-                      }))
-                    }
+                        purchasePrice: parseNumberInput(nextValue),
+                      }));
+                    }}
                   />
                   {errors.purchasePrice ? (
                     <span className="form-error">{errors.purchasePrice}</span>
@@ -239,17 +323,18 @@ export const ProductFormModal = ({
                   </label>
                   <input
                     id="product-stock"
+                    type="text"
                     className="form-input"
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={values.stock}
-                    onChange={(event) =>
+                    inputMode="numeric"
+                    value={numericTexts.stock}
+                    onChange={(event) => {
+                      const nextValue = normalizeNumberInput(event.target.value);
+                      setNumericTexts((prev) => ({ ...prev, stock: nextValue }));
                       setValues((prev) => ({
                         ...prev,
-                        stock: Number(event.target.value || 0),
-                      }))
-                    }
+                        stock: parseNumberInput(nextValue),
+                      }));
+                    }}
                   />
                   {errors.stock ? <span className="form-error">{errors.stock}</span> : null}
                 </div>

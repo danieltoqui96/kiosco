@@ -14,7 +14,7 @@ export function mapProductDBToProduct(product: ProductReadDB): Product {
     salePrice: product.sale_price,
     purchasePrice: product.purchase_price,
     stock: product.stock,
-    isActive: product.is_active,
+    isActive: Boolean(product.is_active),
   };
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../styles/products.css';
 import { brandsApi, categoriesApi } from '../api/catalog.api';
 import { ApiClientError } from '../api/http';
@@ -12,6 +12,8 @@ import type { ProductFormValues, ProductModalState, ProductViewModel } from '../
 import type { ProductRouteState } from '../../../components/layout/MainLayout';
 
 const DEFAULT_PAGE_SIZE = 10;
+const BARCODE_SCAN_MAX_INTERVAL_MS = 100;
+const BARCODE_SCAN_MIN_LENGTH = 4;
 
 const defaultModalState: ProductModalState = {
   isOpen: false,
@@ -44,7 +46,19 @@ function buildUpdatePayload(
   return payload;
 }
 
+function putProductFirst(
+  products: ProductViewModel[],
+  updatedProduct: ProductViewModel,
+): ProductViewModel[] {
+  return [
+    updatedProduct,
+    ...products.filter((product) => product.id !== updatedProduct.id),
+  ];
+}
+
 export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps) => {
+  const scanBufferRef = useRef('');
+  const lastScanKeyTimeRef = useRef(0);
   const [products, setProducts] = useState<ProductViewModel[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(true);
@@ -213,10 +227,19 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
         categoriesApi.getAll({ page: 1, limit: 100 }),
       ]);
 
-      setBrandOptions(brandsResponse.items.map((brand) => brand.name));
-      setCategoryOptions(categoriesResponse.items.map((category) => category.name));
+      const nextBrandOptions = brandsResponse.items.map((brand) => brand.name);
+      const nextCategoryOptions = categoriesResponse.items.map((category) => category.name);
+
+      setBrandOptions(nextBrandOptions);
+      setCategoryOptions(nextCategoryOptions);
+
+      return {
+        brands: nextBrandOptions,
+        categories: nextCategoryOptions,
+      };
     } catch {
       // Keep fallback options derived from current products.
+      return null;
     }
   }, []);
 
@@ -241,7 +264,7 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     [products, selectedProductId],
   );
 
-  const handleBarcodeSearch = async (value: string) => {
+  const handleBarcodeSearch = useCallback(async (value: string) => {
     const normalizedValue = value.trim();
     setBarcodeQuery(normalizedValue);
     setErrorMessage(null);
@@ -296,7 +319,69 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     } finally {
       setIsBarcodeSearching(false);
     }
-  };
+  }, [syncProductRoute]);
+
+  useEffect(() => {
+    if (modalState.isOpen) {
+      scanBufferRef.current = '';
+      lastScanKeyTimeRef.current = 0;
+      return;
+    }
+
+    const isTypingInEditableElement = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tagName = target.tagName.toLowerCase();
+      return (
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        tagName === 'select' ||
+        target.isContentEditable
+      );
+    };
+
+    const resetScanBuffer = () => {
+      scanBufferRef.current = '';
+      lastScanKeyTimeRef.current = 0;
+    };
+
+    const handleDocumentKeyDown = (event: KeyboardEvent) => {
+      if (isTypingInEditableElement(event.target)) return;
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+      const currentTime = Date.now();
+      const elapsedTime = currentTime - lastScanKeyTimeRef.current;
+
+      if (
+        lastScanKeyTimeRef.current > 0 &&
+        elapsedTime > BARCODE_SCAN_MAX_INTERVAL_MS
+      ) {
+        scanBufferRef.current = '';
+      }
+
+      if (event.key === 'Enter') {
+        const scannedCode = scanBufferRef.current.trim();
+        resetScanBuffer();
+
+        if (scannedCode.length >= BARCODE_SCAN_MIN_LENGTH) {
+          event.preventDefault();
+          void handleBarcodeSearch(scannedCode);
+        }
+
+        return;
+      }
+
+      if (event.key.length !== 1) return;
+      if (!/^[\w.-]$/.test(event.key)) return;
+
+      scanBufferRef.current += event.key;
+      lastScanKeyTimeRef.current = currentTime;
+    };
+
+    document.addEventListener('keydown', handleDocumentKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleDocumentKeyDown);
+    };
+  }, [handleBarcodeSearch, modalState.isOpen]);
 
   const handleClearFilters = () => {
     setBarcodeQuery('');
@@ -385,7 +470,41 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
         setSelectedProductId(null);
       }
 
-      await fetchProducts();
+      const catalogs = await fetchCatalogs();
+      const shouldClearBrandFilter =
+        brandFilter.length > 0 && catalogs !== null && !catalogs.brands.includes(brandFilter);
+      const shouldClearCategoryFilter =
+        categoryFilter.length > 0 &&
+        catalogs !== null &&
+        !catalogs.categories.includes(categoryFilter);
+      const nextBrand = shouldClearBrandFilter ? '' : brandFilter;
+      const nextCategory = shouldClearCategoryFilter ? '' : categoryFilter;
+
+      if (shouldClearBrandFilter || shouldClearCategoryFilter) {
+        setBrandFilter(nextBrand);
+        setCategoryFilter(nextCategory);
+        setPage(1);
+        syncProductRoute({
+          brand: nextBrand,
+          category: nextCategory,
+          page: 1,
+        });
+      }
+
+      const response = await productsApi.getAll({
+        page: shouldClearBrandFilter || shouldClearCategoryFilter ? 1 : page,
+        limit: DEFAULT_PAGE_SIZE,
+        search: searchFilter || undefined,
+        brand: nextBrand || undefined,
+        category: nextCategory || undefined,
+        isActive:
+          statusFilter.length === 0
+            ? undefined
+            : statusFilter === 'true',
+      });
+      setProducts(response.items.map(toProductViewModel));
+      setTotalItems(response.total);
+      setTotalPages(response.totalPages);
       setSuccessMessage(`Producto "${product.name}" eliminado.`);
     } catch (error) {
       const message =
@@ -404,7 +523,9 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
     try {
       if (modalState.mode === 'create') {
         const createdProduct = await productsApi.create(values);
+        const createdViewModel = toProductViewModel(createdProduct);
 
+        setProducts((current) => putProductFirst(current, createdViewModel));
         setSelectedProductId(createdProduct.id);
         setIsDetailOpen(true);
         closeProductModal();
@@ -422,11 +543,7 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
           page: 1,
         });
 
-        if (page !== 1) {
-          setPage(1);
-        } else {
-          await fetchProducts();
-        }
+        setPage(1);
 
         void fetchCatalogs();
         setSuccessMessage(`Producto "${createdProduct.name}" creado.`);
@@ -456,12 +573,34 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
           modalState.editingProductId,
           updatePayload,
         );
-        setSelectedProductId(updatedProduct.id);
+        const persistedProduct = await productsApi
+          .getById(updatedProduct.id)
+          .catch(() => updatedProduct);
+        const updatedViewModel = toProductViewModel(persistedProduct);
+
+        setProducts((current) =>
+          putProductFirst(current, updatedViewModel),
+        );
+        setSelectedProductId(persistedProduct.id);
         setIsDetailOpen(true);
         closeProductModal();
-        await fetchProducts();
+        setBarcodeQuery('');
+        setSearchFilter('');
+        setBrandFilter('');
+        setCategoryFilter('');
+        setStatusFilter('');
+        setPage(1);
+        syncProductRoute({
+          codebar: '',
+          search: '',
+          brand: '',
+          category: '',
+          status: '',
+          page: 1,
+        });
+
         void fetchCatalogs();
-        setSuccessMessage(`Producto "${updatedProduct.name}" actualizado.`);
+        setSuccessMessage(`Producto "${persistedProduct.name}" actualizado.`);
       } catch (updateError) {
         if (updateError instanceof ApiClientError && updateError.statusCode === 404) {
           const existingProduct = await productsApi

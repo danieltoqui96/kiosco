@@ -47,21 +47,29 @@ export const ProductTable = ({
   const rangeEnd = Math.min(currentPage * pageSize, totalItems);
 
   return (
-    <section className="data-table-container">
+    <section className="data-table-container products-table app-compact-table">
       <table className="data-table">
+        <colgroup>
+          <col className="products-table__code" />
+          <col className="products-table__product" />
+          <col className="products-table__brand" />
+          <col className="products-table__category" />
+          <col className="products-table__price" />
+          <col className="products-table__stock" />
+          <col className="products-table__state" />
+        </colgroup>
         <thead className="table-header">
           <tr>
+            <th className="table-cell table-cell--header">Codigo</th>
             <th className="table-cell table-cell--header">Producto</th>
             <th className="table-cell table-cell--header">Marca</th>
             <th className="table-cell table-cell--header">Categoria</th>
-            <th className="table-cell table-cell--header">Codigo</th>
             <th className="table-cell table-cell--header table-cell--right">
               Precio
             </th>
             <th className="table-cell table-cell--header table-cell--right">
-              Unidades
+              Stock
             </th>
-            <th className="table-cell table-cell--header">Stock</th>
             <th className="table-cell table-cell--header">Estado</th>
           </tr>
         </thead>
@@ -95,33 +103,50 @@ export const ProductTable = ({
                   }}
                   tabIndex={0}
                 >
+                  <td className="table-cell table-cell--code" title={product.codebar}>
+                    {product.codebar}
+                  </td>
+
                   <td className="table-cell">
                     <div className="product-cell">
                       <div className="product-info">
-                        <span className="product-name">{product.name}</span>
+                        <span className="product-name" title={product.name}>
+                          {product.name}
+                        </span>
                       </div>
                     </div>
                   </td>
 
-                  <td className="table-cell">{product.brand}</td>
-
                   <td className="table-cell">
-                    <span className="category-badge">{product.category}</span>
+                    <span className="products-table__text" title={product.brand}>
+                      {product.brand}
+                    </span>
                   </td>
 
-                  <td className="table-cell table-cell--code">{product.codebar}</td>
+                  <td className="table-cell">
+                    <span className="category-badge" title={product.category}>
+                      {product.category}
+                    </span>
+                  </td>
 
                   <td className="table-cell table-cell--right table-cell--number">
                     {formatCurrency(product.salePrice)}
                   </td>
 
                   <td className="table-cell table-cell--right table-cell--number">
-                    {product.stock}
-                  </td>
-
-                  <td className="table-cell">
-                    <span className={`stock-indicator stock-indicator--${product.stockStatus}`}>
-                      {product.stockAlertLabel ?? 'Normal'}
+                    <span className="products-table__stock-stack">
+                      <strong>{product.stock}</strong>
+                      {product.stockAlertLabel ? (
+                        <span
+                          className={`products-table__stock-dot products-table__stock-dot--${product.stockStatus}`}
+                          title={product.stockAlertLabel}
+                          aria-label={product.stockAlertLabel}
+                        >
+                          !
+                        </span>
+                      ) : (
+                        <span className="products-table__stock-dot products-table__stock-dot--empty" aria-hidden="true" />
+                      )}
                     </span>
                   </td>
 

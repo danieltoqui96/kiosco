@@ -118,18 +118,26 @@ export class BrandsModel {
   }
 
   static async getOrCreateBrand(name: string): Promise<Brand> {
+    const normalizedName = name.trim().toUpperCase();
     const [rows] = await pool.query<BrandDB[]>(
       'SELECT * FROM brands WHERE name = ?',
-      [name],
+      [normalizedName],
     );
 
     const data = rows[0];
-    if (data)
+    if (data) {
+      if (data.name !== normalizedName) {
+        await pool.query<ResultSetHeader>(
+          'UPDATE brands SET name = ? WHERE id = ?',
+          [normalizedName, data.id],
+        );
+      }
       return {
         id: data.id,
-        name: data.name,
+        name: normalizedName,
       };
+    }
 
-    return this.addBrand({ name });
+    return this.addBrand({ name: normalizedName });
   }
 }

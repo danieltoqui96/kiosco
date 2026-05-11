@@ -31,27 +31,102 @@ function formatDay(value: string): string {
   return new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium' }).format(date);
 }
 
-function formatTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('es-CL', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
+function formatDayParts(value: string): { date: string } {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return {
+      date: value,
+    };
+  }
+
+  return {
+    date: new Intl.DateTimeFormat('es-CL', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(date),
+  };
 }
 
-function formatDateTime(value: string): string {
+function formatDateTimeParts(value: string): { date: string; time: string } {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('es-CL', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
+  if (Number.isNaN(date.getTime())) {
+    return {
+      date: value,
+      time: '',
+    };
+  }
+
+  return {
+    date: new Intl.DateTimeFormat('es-CL', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(date),
+    time: new Intl.DateTimeFormat('es-CL', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date),
+  };
+}
+
+function DateOnlyCell({
+  value,
+  compact = false,
+}: {
+  value: string;
+  compact?: boolean;
+}) {
+  const dateParts = formatDayParts(value);
+
+  return (
+    <span className={`date-cell${compact ? ' date-cell--compact' : ''}`}>
+      <span className="date-cell__day">{dateParts.date}</span>
+    </span>
+  );
+}
+
+function DateTimeCell({
+  value,
+  compact = false,
+}: {
+  value: string;
+  compact?: boolean;
+}) {
+  const dateParts = formatDateTimeParts(value);
+
+  return (
+    <span className={`date-cell${compact ? ' date-cell--compact' : ''}`}>
+      <span className="date-cell__day">{dateParts.date}</span>
+      {dateParts.time ? <span className="date-cell__time">{dateParts.time}</span> : null}
+    </span>
+  );
+}
+
+function TimeCell({ value }: { value: string }) {
+  const dateParts = formatDateTimeParts(value);
+
+  return (
+    <span className="date-cell date-cell--time-only">
+      <span className="date-cell__time">{dateParts.time || dateParts.date}</span>
+    </span>
+  );
+}
+
+function parseAmountInput(value: string): number {
+  const normalizedValue = value.replace(/\./g, '').trim();
+  if (normalizedValue.length === 0) return 0;
+  const parsed = Number(normalizedValue);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function formatAmountInput(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 0) return '';
+  return new Intl.NumberFormat('es-CL', {
+    maximumFractionDigits: 0,
+  }).format(Number(digits));
 }
 
 function getErrorMessage(error: unknown): string {
@@ -90,21 +165,11 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [depositPaymentMethod, setDepositPaymentMethod] = useState<'cash' | 'card'>('cash');
-  const [depositReason, setDepositReason] = useState<'purchase' | 'deposit' | 'change' | 'other'>(
-    'deposit',
-  );
-  const [depositReference, setDepositReference] = useState('');
-  const [depositNote, setDepositNote] = useState('');
   const [isSavingDeposit, setIsSavingDeposit] = useState(false);
 
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawPaymentMethod, setWithdrawPaymentMethod] = useState<'cash' | 'card'>('cash');
-  const [withdrawReason, setWithdrawReason] = useState<'purchase' | 'deposit' | 'change' | 'other'>(
-    'purchase',
-  );
-  const [withdrawReference, setWithdrawReference] = useState('');
-  const [withdrawNote, setWithdrawNote] = useState('');
   const [isSavingWithdrawal, setIsSavingWithdrawal] = useState(false);
 
   useEffect(() => {
@@ -232,7 +297,7 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
     event.preventDefault();
     if (!selectedDay || isSavingDeposit) return;
 
-    const parsedAmount = Number(depositAmount);
+    const parsedAmount = parseAmountInput(depositAmount);
     if (!Number.isInteger(parsedAmount) || parsedAmount <= 0) {
       setErrorMessage('El ingreso debe ser un monto entero mayor a 0.');
       return;
@@ -245,17 +310,12 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
       const detail = await cashApi.createDeposit(selectedDay, {
         paymentMethod: depositPaymentMethod,
         amount: parsedAmount,
-        reason: depositReason,
-        reference: depositReference.trim() || undefined,
-        note: depositNote.trim() || undefined,
+        reason: 'deposit',
       });
       setSelectedDetail(detail);
       setIsDepositModalOpen(false);
       setDepositAmount('');
       setDepositPaymentMethod('cash');
-      setDepositReason('deposit');
-      setDepositReference('');
-      setDepositNote('');
       setSuccessMessage(`Ingreso registrado para ${formatDay(selectedDay)}.`);
       await fetchSummary();
     } catch (error) {
@@ -269,7 +329,7 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
     event.preventDefault();
     if (!selectedDay || isSavingWithdrawal) return;
 
-    const parsedAmount = Number(withdrawAmount);
+    const parsedAmount = parseAmountInput(withdrawAmount);
     if (!Number.isInteger(parsedAmount) || parsedAmount <= 0) {
       setErrorMessage('El retiro debe ser un monto entero mayor a 0.');
       return;
@@ -283,16 +343,11 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
       const detail = await cashApi.createWithdrawal(selectedDay, {
         paymentMethod: withdrawPaymentMethod,
         amount: parsedAmount,
-        reason: withdrawReason,
-        reference: withdrawReference.trim() || undefined,
-        note: withdrawNote.trim() || undefined,
+        reason: 'purchase',
       });
       setSelectedDetail(detail);
       setIsWithdrawModalOpen(false);
       setWithdrawAmount('');
-      setWithdrawReason('purchase');
-      setWithdrawReference('');
-      setWithdrawNote('');
       setWithdrawPaymentMethod('cash');
       setSuccessMessage(`Retiro registrado para ${formatDay(selectedDay)}.`);
       await fetchSummary();
@@ -409,8 +464,16 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
         {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
         {successMessage ? <p className="form-success">{successMessage}</p> : null}
 
-        <section className="data-table-container">
+        <section className="data-table-container cash-table app-compact-table">
           <table className="data-table">
+            <colgroup>
+              <col className="cash-table__day" />
+              <col className="cash-table__sales" />
+              <col className="cash-table__items" />
+              <col className="cash-table__cash" />
+              <col className="cash-table__card" />
+              <col className="cash-table__total" />
+            </colgroup>
             <thead className="table-header">
               <tr>
                 <th className="table-cell table-cell--header">Dia</th>
@@ -450,7 +513,9 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
                         }
                       }}
                     >
-                      <td className="table-cell">{formatDay(day.day)}</td>
+                      <td className="table-cell">
+                        <DateOnlyCell value={day.day} />
+                      </td>
                       <td className="table-cell table-cell--right table-cell--number">
                         {day.salesCount}
                       </td>
@@ -550,32 +615,34 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
             </div>
           ) : (
             <>
-              <div className="cash-detail-overview">
-                <div className="cash-detail-head">
+              <div className="detail-summary-card">
+                <div className="detail-summary-head">
                   <span className="status-badge status-badge--active">Caja del dia</span>
-                  <h3 className="cash-detail-day">{formatDay(selectedDetail.summary.day)}</h3>
-                  <div className="cash-mini-metrics">
-                    <span className="cash-mini-pill">Ventas {selectedDetail.summary.salesCount}</span>
-                    <span className="cash-mini-pill">Items {selectedDetail.summary.itemsCount}</span>
+                  <h3 className="detail-summary-title">
+                    <DateOnlyCell value={selectedDetail.summary.day} compact />
+                  </h3>
+                  <div className="detail-summary-pills">
+                    <span className="detail-summary-pill">Ventas {selectedDetail.summary.salesCount}</span>
+                    <span className="detail-summary-pill">Items {selectedDetail.summary.itemsCount}</span>
                   </div>
                 </div>
 
-                <div className="cash-balance-grid">
-                  <div className="cash-balance-item">
-                    <span className="cash-balance-label">Efectivo</span>
-                    <span className="cash-balance-value">
+                <div className="detail-summary-grid">
+                  <div className="detail-summary-item">
+                    <span className="detail-summary-label">Efectivo</span>
+                    <span className="detail-summary-value">
                       {formatCurrency(selectedDetail.summary.currentCash)}
                     </span>
                   </div>
-                  <div className="cash-balance-item">
-                    <span className="cash-balance-label">Tarjeta</span>
-                    <span className="cash-balance-value">
+                  <div className="detail-summary-item">
+                    <span className="detail-summary-label">Tarjeta</span>
+                    <span className="detail-summary-value">
                       {formatCurrency(selectedDetail.summary.currentCard)}
                     </span>
                   </div>
-                  <div className="cash-balance-item">
-                    <span className="cash-balance-label">Retiros</span>
-                    <span className="cash-balance-value">
+                  <div className="detail-summary-item">
+                    <span className="detail-summary-label">Retiros</span>
+                    <span className="detail-summary-value">
                       {formatCurrency(
                         selectedDetail.summary.withdrawalsCash + selectedDetail.summary.withdrawalsCard,
                       )}
@@ -608,7 +675,9 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
                         selectedDetail.sales.map((sale) => (
                           <tr key={sale.saleId} className="table-row">
                             <td className="table-cell">#{sale.saleId}</td>
-                            <td className="table-cell">{formatTime(sale.soldAt)}</td>
+                            <td className="table-cell">
+                              <TimeCell value={sale.soldAt} />
+                            </td>
                             <td className="table-cell table-cell--right table-cell--number">
                               {sale.totalItems}
                             </td>
@@ -665,7 +734,9 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
                       ) : (
                         selectedDetail.withdrawals.map((withdrawal) => (
                           <tr key={withdrawal.id} className="table-row">
-                            <td className="table-cell">{formatDateTime(withdrawal.createdAt)}</td>
+                            <td className="table-cell">
+                              <DateTimeCell value={withdrawal.createdAt} compact />
+                            </td>
                             <td className="table-cell table-cell--center">
                               <span
                                 className={`cash-icon-badge ${
@@ -762,52 +833,9 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
                       className="form-input"
                       inputMode="numeric"
                       value={depositAmount}
-                      onChange={(event) => setDepositAmount(event.target.value)}
+                      onChange={(event) => setDepositAmount(formatAmountInput(event.target.value))}
                     />
                   </div>
-                </div>
-                <div className="form-grid form-grid--2col">
-                  <div className="form-field">
-                    <label className="form-label" htmlFor="deposit-reason">
-                      Motivo
-                    </label>
-                    <select
-                      id="deposit-reason"
-                      className="form-select"
-                      value={depositReason}
-                      onChange={(event) =>
-                        setDepositReason(
-                          event.target.value as 'purchase' | 'deposit' | 'change' | 'other',
-                        )
-                      }
-                    >
-                      <option value="deposit">Ingreso</option>
-                      <option value="change">Cambio</option>
-                      <option value="other">Otro</option>
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label className="form-label" htmlFor="deposit-reference">
-                      Referencia
-                    </label>
-                    <input
-                      id="deposit-reference"
-                      className="form-input"
-                      value={depositReference}
-                      onChange={(event) => setDepositReference(event.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="form-field">
-                  <label className="form-label" htmlFor="deposit-note">
-                    Nota (opcional)
-                  </label>
-                  <input
-                    id="deposit-note"
-                    className="form-input"
-                    value={depositNote}
-                    onChange={(event) => setDepositNote(event.target.value)}
-                  />
                 </div>
               </div>
               <div className="modal-footer">
@@ -860,52 +888,9 @@ export const CashPage = ({ routeState, onRouteStateChange }: CashPageProps) => {
                       className="form-input"
                       inputMode="numeric"
                       value={withdrawAmount}
-                      onChange={(event) => setWithdrawAmount(event.target.value)}
+                      onChange={(event) => setWithdrawAmount(formatAmountInput(event.target.value))}
                     />
                   </div>
-                </div>
-                <div className="form-grid form-grid--2col">
-                  <div className="form-field">
-                    <label className="form-label" htmlFor="withdraw-reason">
-                      Motivo
-                    </label>
-                    <select
-                      id="withdraw-reason"
-                      className="form-select"
-                      value={withdrawReason}
-                      onChange={(event) =>
-                        setWithdrawReason(
-                          event.target.value as 'purchase' | 'deposit' | 'change' | 'other',
-                        )
-                      }
-                    >
-                      <option value="purchase">Compra</option>
-                      <option value="change">Cambio</option>
-                      <option value="other">Otro</option>
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label className="form-label" htmlFor="withdraw-reference">
-                      Referencia
-                    </label>
-                    <input
-                      id="withdraw-reference"
-                      className="form-input"
-                      value={withdrawReference}
-                      onChange={(event) => setWithdrawReference(event.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="form-field">
-                  <label className="form-label" htmlFor="withdraw-note">
-                    Nota (opcional)
-                  </label>
-                  <input
-                    id="withdraw-note"
-                    className="form-input"
-                    value={withdrawNote}
-                    onChange={(event) => setWithdrawNote(event.target.value)}
-                  />
                 </div>
               </div>
               <div className="modal-footer">

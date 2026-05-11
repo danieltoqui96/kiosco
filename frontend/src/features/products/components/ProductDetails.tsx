@@ -49,26 +49,32 @@ export const ProductDetails = ({
           </div>
         ) : (
           <>
-            <div className="detail-hero">
-              <div className="detail-header-info">
+            <div className="detail-summary-card">
+              <div className="detail-summary-head">
                 <span className={getStatusBadgeClass(product.statusLabel)}>
                   {product.statusLabel}
                 </span>
-                <h3 className="detail-title">{product.name}</h3>
-                <p className="detail-sku">ID: {product.id}</p>
+                <h3 className="detail-summary-title">{product.name}</h3>
+                <div className="detail-summary-pills">
+                  <span className="detail-summary-pill">ID {product.id}</span>
+                </div>
               </div>
-            </div>
 
-            <div className="detail-stats">
-              <div className="stat-card">
-                <span className="stat-label">Precio venta</span>
-                <span className="stat-value stat-value--price">
-                  {formatCurrency(product.salePrice)}
-                </span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">Stock</span>
-                <span className="stat-value">{product.stock} unidades</span>
+              <div className="detail-summary-grid">
+                <div className="detail-summary-item">
+                  <span className="detail-summary-label">Precio venta</span>
+                  <span className="detail-summary-value">
+                    {formatCurrency(product.salePrice)}
+                  </span>
+                </div>
+                <div className="detail-summary-item">
+                  <span className="detail-summary-label">Stock</span>
+                  <span className="detail-summary-value">{product.stock}</span>
+                </div>
+                <div className="detail-summary-item">
+                  <span className="detail-summary-label">Marca</span>
+                  <span className="detail-summary-value">{product.brand}</span>
+                </div>
               </div>
             </div>
 

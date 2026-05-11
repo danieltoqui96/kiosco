@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import '../../../features/products/styles/products.css';
 import { ApiClientError } from '../../products/api/http';
 import { productsApi } from '../../products/api/products.api';
@@ -15,6 +22,8 @@ const DEFAULT_PAGE_SIZE = 10;
 const MODAL_PRODUCTS_LIMIT = 100;
 const MODAL_SEARCH_MIN_CHARS = 2;
 const MODAL_SEARCH_DEBOUNCE_MS = 250;
+const BARCODE_SCAN_MAX_INTERVAL_MS = 100;
+const BARCODE_SCAN_MIN_LENGTH = 4;
 
 interface SalesPageProps {
   routeState: SalesRouteState;
@@ -40,16 +49,51 @@ function buildVisiblePages(currentPage: number, totalPages: number): number[] {
   return [1, currentPage - 1, currentPage, currentPage + 1, totalPages];
 }
 
-function formatDateTime(value: string): string {
+function formatSaleDateParts(value: string): { date: string; time: string } {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('es-CL', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date);
+  if (Number.isNaN(date.getTime())) {
+    return {
+      date: value,
+      time: '',
+    };
+  }
+
+  return {
+    date: new Intl.DateTimeFormat('es-CL', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(date),
+    time: new Intl.DateTimeFormat('es-CL', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date),
+  };
+}
+
+function DateTimeCell({
+  value,
+  compact = false,
+}: {
+  value: string;
+  compact?: boolean;
+}) {
+  const dateParts = formatSaleDateParts(value);
+
+  return (
+    <span className={`date-cell${compact ? ' date-cell--compact' : ''}`}>
+      <span className="date-cell__day">{dateParts.date}</span>
+      {dateParts.time ? <span className="date-cell__time">{dateParts.time}</span> : null}
+    </span>
+  );
 }
 
 export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) => {
+  const modalScanBufferRef = useRef('');
+  const lastModalScanKeyTimeRef = useRef(0);
+  const quantityRepeatTimeoutRef = useRef<number | null>(null);
+  const quantityRepeatIntervalRef = useRef<number | null>(null);
   const [sales, setSales] = useState<SaleSummary[]>([]);
   const [page, setPage] = useState(routeState.page);
   const [search, setSearch] = useState(routeState.q);
@@ -275,7 +319,7 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
           name: item.productName,
           brand: item.brandName,
           salePrice: item.unitPrice,
-          stock: Math.max(product?.stock ?? 0, item.quantity),
+          stock: (product?.stock ?? 0) + item.quantity,
         },
       }));
 
@@ -307,16 +351,19 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
   const getAvailableStock = useCallback(
     (product: SaleProduct): number => {
       const reserved = reservedByProduct.get(product.id) ?? 0;
-      return Math.max(0, product.stock - reserved);
+      const cartItem = cartItems.find((item) => item.product.id === product.id);
+      const stockLimit = cartItem?.product.stock ?? product.stock;
+      return Math.max(0, stockLimit - reserved);
     },
-    [reservedByProduct],
+    [cartItems, reservedByProduct],
   );
 
-  const addProductToCart = (product: SaleProduct) => {
+  const addProductToCart = useCallback((product: SaleProduct) => {
     setCartItems((current) => {
       const existing = current.find((item) => item.product.id === product.id);
       const reserved = existing?.quantity ?? 0;
-      if (reserved >= product.stock) return current;
+      const stockLimit = existing?.product.stock ?? product.stock;
+      if (reserved >= stockLimit) return current;
 
       if (!existing) return [...current, { product, quantity: 1 }];
 
@@ -326,7 +373,7 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
           : item,
       );
     });
-  };
+  }, []);
 
   const handleAddProductFromSearch = (product: SaleProduct) => {
     addProductToCart(product);
@@ -335,18 +382,148 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
     setIsAutocompleteOpen(false);
   };
 
-  const updateCartQuantity = (productId: number, delta: number) => {
+  const handleAddProductByBarcode = useCallback(
+    async (codebar: string) => {
+      const normalizedCodebar = codebar.trim();
+      if (normalizedCodebar.length === 0) return;
+
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      setIsLoadingModalProducts(true);
+
+      try {
+        const response = await salesApi.getProducts({
+          page: 1,
+          limit: MODAL_PRODUCTS_LIMIT,
+          q: normalizedCodebar,
+        });
+        const product = response.items.find(
+          (item) => item.codebar === normalizedCodebar,
+        );
+
+        if (!product) {
+          setErrorMessage(`No existe un producto activo con codigo ${normalizedCodebar}.`);
+          return;
+        }
+
+        const currentCartItem = cartItems.find((item) => item.product.id === product.id);
+        const stockLimit = currentCartItem?.product.stock ?? product.stock;
+        if ((currentCartItem?.quantity ?? 0) >= stockLimit) {
+          setErrorMessage(`No queda stock disponible para ${product.name}.`);
+          return;
+        }
+
+        addProductToCart(product);
+        setModalSearch('');
+        setModalProducts([]);
+        setIsAutocompleteOpen(false);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'No se pudo agregar el producto escaneado.',
+        );
+      } finally {
+        setIsLoadingModalProducts(false);
+      }
+    },
+    [addProductToCart, cartItems],
+  );
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      modalScanBufferRef.current = '';
+      lastModalScanKeyTimeRef.current = 0;
+      return;
+    }
+
+    const resetScanBuffer = () => {
+      modalScanBufferRef.current = '';
+      lastModalScanKeyTimeRef.current = 0;
+    };
+
+    const handleDocumentKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+      const currentTime = Date.now();
+      const elapsedTime = currentTime - lastModalScanKeyTimeRef.current;
+
+      if (
+        lastModalScanKeyTimeRef.current > 0 &&
+        elapsedTime > BARCODE_SCAN_MAX_INTERVAL_MS
+      ) {
+        modalScanBufferRef.current = '';
+      }
+
+      if (event.key === 'Enter') {
+        const scannedCode = modalScanBufferRef.current.trim();
+        resetScanBuffer();
+
+        if (scannedCode.length >= BARCODE_SCAN_MIN_LENGTH) {
+          event.preventDefault();
+          void handleAddProductByBarcode(scannedCode);
+        }
+
+        return;
+      }
+
+      if (event.key.length !== 1) return;
+      if (!/^[\w.-]$/.test(event.key)) return;
+
+      modalScanBufferRef.current += event.key;
+      lastModalScanKeyTimeRef.current = currentTime;
+    };
+
+    document.addEventListener('keydown', handleDocumentKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleDocumentKeyDown);
+    };
+  }, [handleAddProductByBarcode, isModalOpen]);
+
+  const updateCartQuantity = useCallback((productId: number, delta: number) => {
     setCartItems((current) =>
       current.flatMap((item) => {
         if (item.product.id !== productId) return [item];
 
         const nextQuantity = item.quantity + delta;
-        if (nextQuantity <= 0) return [];
+        if (nextQuantity < 1) return [item];
         if (nextQuantity > item.product.stock) return [item];
         return [{ ...item, quantity: nextQuantity }];
       }),
     );
-  };
+  }, []);
+
+  const stopQuantityRepeat = useCallback(() => {
+    if (quantityRepeatTimeoutRef.current !== null) {
+      window.clearTimeout(quantityRepeatTimeoutRef.current);
+      quantityRepeatTimeoutRef.current = null;
+    }
+
+    if (quantityRepeatIntervalRef.current !== null) {
+      window.clearInterval(quantityRepeatIntervalRef.current);
+      quantityRepeatIntervalRef.current = null;
+    }
+  }, []);
+
+  const startQuantityRepeat = useCallback(
+    (productId: number, delta: number) => {
+      stopQuantityRepeat();
+      updateCartQuantity(productId, delta);
+
+      quantityRepeatTimeoutRef.current = window.setTimeout(() => {
+        quantityRepeatIntervalRef.current = window.setInterval(() => {
+          updateCartQuantity(productId, delta);
+        }, 85);
+      }, 350);
+    },
+    [stopQuantityRepeat, updateCartQuantity],
+  );
+
+  useEffect(() => {
+    return () => {
+      stopQuantityRepeat();
+    };
+  }, [stopQuantityRepeat]);
 
   const removeFromCart = (productId: number) => {
     setCartItems((current) => current.filter((item) => item.product.id !== productId));
@@ -506,15 +683,16 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
           <div className="filters-group">
             <div className="filter-item">
               <label className="filter-label" htmlFor="sales-search">
-                Buscar
+                Buscar venta
               </label>
               <input
                 id="sales-search"
                 className="form-input"
-                placeholder="ID, producto, marca o codigo"
+                inputMode="numeric"
+                placeholder="ID de venta"
                 value={search}
                 onChange={(event) => {
-                  const value = event.target.value;
+                  const value = event.target.value.replace(/\D/g, '');
                   setSearch(value);
                   setPage(1);
                   syncRoute({ q: value, page: 1 });
@@ -582,8 +760,15 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
         {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
         {successMessage ? <p className="form-success">{successMessage}</p> : null}
 
-        <section className="data-table-container">
+        <section className="data-table-container sales-table app-compact-table">
           <table className="data-table">
+            <colgroup>
+              <col className="sales-table__id" />
+              <col className="sales-table__date" />
+              <col className="sales-table__payment" />
+              <col className="sales-table__items" />
+              <col className="sales-table__total" />
+            </colgroup>
             <thead className="table-header">
               <tr>
                 <th className="table-cell table-cell--header">ID</th>
@@ -623,9 +808,13 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
                       }}
                     >
                       <td className="table-cell">#{sale.id}</td>
-                      <td className="table-cell">{formatDateTime(sale.createdAt)}</td>
                       <td className="table-cell">
-                        {sale.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}
+                        <DateTimeCell value={sale.createdAt} />
+                      </td>
+                      <td className="table-cell">
+                        <span className={`payment-badge payment-badge--${sale.paymentMethod}`}>
+                          {sale.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}
+                        </span>
                       </td>
                       <td className="table-cell table-cell--right table-cell--number">
                         {sale.totalItems}
@@ -721,52 +910,73 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
             </div>
           ) : (
             <>
-              <div className="detail-hero">
-                <div className="detail-header-info">
+              <div className="detail-summary-card">
+                <div className="detail-summary-head">
                   <span className="status-badge status-badge--active">Venta registrada</span>
-                  <h3 className="detail-title">Venta #{selectedSale.id}</h3>
-                  <p className="detail-sku">{formatDateTime(selectedSale.createdAt)}</p>
+                  <h3 className="detail-summary-title">Venta #{selectedSale.id}</h3>
+                  <div className="detail-summary-pills">
+                    <span className="detail-summary-pill">
+                      <DateTimeCell value={selectedSale.createdAt} compact />
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="detail-stats">
-                <div className="stat-card">
-                  <span className="stat-label">Total</span>
-                  <span className="stat-value stat-value--price">
-                    {formatCurrency(selectedSale.totalAmount)}
-                  </span>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-label">Items</span>
-                  <span className="stat-value">{selectedSale.totalItems}</span>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-label">Tipo de pago</span>
-                  <span className="stat-value">
-                    {selectedSale.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}
-                  </span>
+                <div className="detail-summary-grid">
+                  <div className="detail-summary-item">
+                    <span className="detail-summary-label">Total</span>
+                    <span className="detail-summary-value">
+                      {formatCurrency(selectedSale.totalAmount)}
+                    </span>
+                  </div>
+                  <div className="detail-summary-item">
+                    <span className="detail-summary-label">Items</span>
+                    <span className="detail-summary-value">{selectedSale.totalItems}</span>
+                  </div>
+                  <div className="detail-summary-item">
+                    <span className="detail-summary-label">Tipo de pago</span>
+                    <span className="detail-summary-value">
+                      {selectedSale.paymentMethod === 'card' ? 'Tarjeta' : 'Efectivo'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               <div className="detail-section">
                 <h4 className="section-title">Productos vendidos</h4>
-                <div className="data-table-container">
+                <div className="data-table-container sales-detail-items-table">
                   <table className="data-table">
+                    <colgroup>
+                      <col className="sales-detail-items-table__code" />
+                      <col className="sales-detail-items-table__product" />
+                      <col className="sales-detail-items-table__brand" />
+                      <col className="sales-detail-items-table__qty" />
+                      <col className="sales-detail-items-table__price" />
+                    </colgroup>
                     <thead className="table-header">
                       <tr>
-                        <th className="table-cell table-cell--header">Codigo</th>
+                        <th className="table-cell table-cell--header">Cod.</th>
                         <th className="table-cell table-cell--header">Producto</th>
                         <th className="table-cell table-cell--header">Marca</th>
                         <th className="table-cell table-cell--header table-cell--right">Cant.</th>
-                        <th className="table-cell table-cell--header table-cell--right">Precio</th>
+                        <th className="table-cell table-cell--header table-cell--right">Total</th>
                       </tr>
                     </thead>
                     <tbody className="table-body">
                       {selectedSale.items.map((item) => (
                         <tr className="table-row" key={`${selectedSale.id}-${item.productId}`}>
-                          <td className="table-cell table-cell--code">{item.productCodebar}</td>
-                          <td className="table-cell">{item.productName}</td>
-                          <td className="table-cell">{item.brandName}</td>
+                          <td className="table-cell table-cell--code" title={item.productCodebar}>
+                            {item.productCodebar}
+                          </td>
+                          <td className="table-cell" title={item.productName}>
+                            <span className="sales-detail-items-table__text">
+                              {item.productName}
+                            </span>
+                          </td>
+                          <td className="table-cell" title={item.brandName}>
+                            <span className="sales-detail-items-table__text">
+                              {item.brandName}
+                            </span>
+                          </td>
                           <td className="table-cell table-cell--right table-cell--number">
                             {item.quantity}
                           </td>
@@ -942,7 +1152,19 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
                                   <button
                                     type="button"
                                     className="btn btn-ghost sales-qty-btn"
-                                    onClick={() => updateCartQuantity(item.product.id, -1)}
+                                    onPointerDown={(event) => {
+                                      event.preventDefault();
+                                      startQuantityRepeat(item.product.id, -1);
+                                    }}
+                                    onPointerUp={stopQuantityRepeat}
+                                    onPointerLeave={stopQuantityRepeat}
+                                    onPointerCancel={stopQuantityRepeat}
+                                    onBlur={stopQuantityRepeat}
+                                    onClick={(event) => {
+                                      if (event.detail === 0) {
+                                        updateCartQuantity(item.product.id, -1);
+                                      }
+                                    }}
                                   >
                                     -
                                   </button>
@@ -950,7 +1172,19 @@ export const SalesPage = ({ routeState, onRouteStateChange }: SalesPageProps) =>
                                   <button
                                     type="button"
                                     className="btn btn-ghost sales-qty-btn"
-                                    onClick={() => updateCartQuantity(item.product.id, 1)}
+                                    onPointerDown={(event) => {
+                                      event.preventDefault();
+                                      startQuantityRepeat(item.product.id, 1);
+                                    }}
+                                    onPointerUp={stopQuantityRepeat}
+                                    onPointerLeave={stopQuantityRepeat}
+                                    onPointerCancel={stopQuantityRepeat}
+                                    onBlur={stopQuantityRepeat}
+                                    onClick={(event) => {
+                                      if (event.detail === 0) {
+                                        updateCartQuantity(item.product.id, 1);
+                                      }
+                                    }}
                                     disabled={item.quantity >= item.product.stock}
                                   >
                                     +

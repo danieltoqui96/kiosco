@@ -83,23 +83,8 @@ function buildSalesWhere(search?: string): {
 
   if (search) {
     const value = `%${search}%`;
-    andClauses.push(
-      `
-        (
-          CAST(s.id AS CHAR) LIKE ?
-          OR EXISTS (
-            SELECT 1
-            FROM sale_items si_search
-            WHERE si_search.sale_id = s.id
-            AND (
-              si_search.product_name LIKE ?
-              OR si_search.product_codebar LIKE ?
-            )
-          )
-        )
-      `,
-    );
-    whereParams.push(value, value, value);
+    andClauses.push('CAST(s.id AS CHAR) LIKE ?');
+    whereParams.push(value);
   }
 
   const whereSql = andClauses.length > 0 ? `WHERE ${andClauses.join(' AND ')}` : '';

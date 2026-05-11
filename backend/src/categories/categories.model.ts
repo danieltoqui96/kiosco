@@ -122,18 +122,26 @@ export class CategoriesModel {
   }
 
   static async getOrCreateCategory(name: string): Promise<Category> {
+    const normalizedName = name.trim().toUpperCase();
     const [rows] = await pool.query<CategoryDB[]>(
       'SELECT * FROM categories WHERE name = ?',
-      [name],
+      [normalizedName],
     );
 
     const data = rows[0];
-    if (data)
+    if (data) {
+      if (data.name !== normalizedName) {
+        await pool.query<ResultSetHeader>(
+          'UPDATE categories SET name = ? WHERE id = ?',
+          [normalizedName, data.id],
+        );
+      }
       return {
         id: data.id,
-        name: data.name,
+        name: normalizedName,
       };
+    }
 
-    return this.addCategory({ name });
+    return this.addCategory({ name: normalizedName });
   }
 }
