@@ -4,12 +4,14 @@ interface SidebarProps {
   activeSection: AppSection;
   onGoToProducts: () => void;
   onGoToSales: () => void;
+  onGoToCash: () => void;
 }
 
 export const Sidebar = ({
   activeSection,
   onGoToProducts,
   onGoToSales,
+  onGoToCash,
 }: SidebarProps) => {
   return (
     <div>
@@ -35,6 +37,14 @@ export const Sidebar = ({
           >
             <span className="nav-icon">V</span>
             <span className="nav-label">Ventas</span>
+          </button>
+          <button
+            type="button"
+            className={`nav-item${activeSection === 'cash' ? ' active' : ''}`}
+            onClick={onGoToCash}
+          >
+            <span className="nav-icon">C</span>
+            <span className="nav-label">Caja</span>
           </button>
         </nav>
       </aside>

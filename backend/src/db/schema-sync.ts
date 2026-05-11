@@ -260,9 +260,170 @@ async function ensureSalesForeignKeys(): Promise<void> {
   }
 }
 
+async function ensureCashTables(): Promise<void> {
+  await pool.query(
+    `
+      CREATE TABLE IF NOT EXISTS cash_daily_balances (
+        day_date DATE NOT NULL,
+        initial_cash INT NOT NULL DEFAULT 0,
+        initial_card INT NOT NULL DEFAULT 0,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (day_date)
+      ) ENGINE=InnoDB
+    `,
+  );
+
+  await pool.query(
+    `
+      CREATE TABLE IF NOT EXISTS cash_withdrawals (
+        id INT NOT NULL AUTO_INCREMENT,
+        day_date DATE NOT NULL,
+        movement_type ENUM('in', 'out') NOT NULL DEFAULT 'out',
+        payment_method ENUM('cash', 'card') NOT NULL DEFAULT 'cash',
+        amount INT NOT NULL,
+        reason ENUM('purchase', 'deposit', 'change', 'other') NOT NULL DEFAULT 'other',
+        reference VARCHAR(100) NULL,
+        note VARCHAR(255) NULL,
+        voided_at DATETIME NULL,
+        voided_reason VARCHAR(255) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_cash_withdrawals_day (day_date),
+        KEY idx_cash_withdrawals_type (movement_type),
+        KEY idx_cash_withdrawals_method (payment_method),
+        KEY idx_cash_withdrawals_voided (voided_at)
+      ) ENGINE=InnoDB
+    `,
+  );
+}
+
+async function ensureCashColumns(): Promise<void> {
+  if (!(await hasColumn('cash_daily_balances', 'initial_cash'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_daily_balances
+        ADD COLUMN initial_cash INT NOT NULL DEFAULT 0
+      `,
+    );
+  }
+
+  if (!(await hasColumn('cash_daily_balances', 'initial_card'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_daily_balances
+        ADD COLUMN initial_card INT NOT NULL DEFAULT 0
+      `,
+    );
+  }
+
+  if (!(await hasColumn('cash_withdrawals', 'payment_method'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD COLUMN payment_method ENUM('cash', 'card') NOT NULL DEFAULT 'cash'
+      `,
+    );
+  }
+
+  if (!(await hasColumn('cash_withdrawals', 'movement_type'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD COLUMN movement_type ENUM('in', 'out') NOT NULL DEFAULT 'out'
+      `,
+    );
+  }
+
+  if (!(await hasColumn('cash_withdrawals', 'day_date'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD COLUMN day_date DATE NOT NULL
+      `,
+    );
+  }
+
+  if (!(await hasColumn('cash_withdrawals', 'reason'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD COLUMN reason ENUM('purchase', 'deposit', 'change', 'other') NOT NULL DEFAULT 'other'
+      `,
+    );
+  }
+
+  if (!(await hasColumn('cash_withdrawals', 'reference'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD COLUMN reference VARCHAR(100) NULL
+      `,
+    );
+  }
+
+  if (!(await hasColumn('cash_withdrawals', 'voided_at'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD COLUMN voided_at DATETIME NULL
+      `,
+    );
+  }
+
+  if (!(await hasColumn('cash_withdrawals', 'voided_reason'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD COLUMN voided_reason VARCHAR(255) NULL
+      `,
+    );
+  }
+}
+
+async function ensureCashIndexes(): Promise<void> {
+  if (!(await hasIndex('cash_withdrawals', 'idx_cash_withdrawals_day'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD INDEX idx_cash_withdrawals_day (day_date)
+      `,
+    );
+  }
+
+  if (!(await hasIndex('cash_withdrawals', 'idx_cash_withdrawals_method'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD INDEX idx_cash_withdrawals_method (payment_method)
+      `,
+    );
+  }
+
+  if (!(await hasIndex('cash_withdrawals', 'idx_cash_withdrawals_type'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD INDEX idx_cash_withdrawals_type (movement_type)
+      `,
+    );
+  }
+
+  if (!(await hasIndex('cash_withdrawals', 'idx_cash_withdrawals_voided'))) {
+    await pool.query(
+      `
+        ALTER TABLE cash_withdrawals
+        ADD INDEX idx_cash_withdrawals_voided (voided_at)
+      `,
+    );
+  }
+}
+
 export async function ensureAppSchema(): Promise<void> {
   await ensureSalesTables();
   await ensureSalesCompatibilityColumns();
   await ensureSalesIndexes();
   await ensureSalesForeignKeys();
+  await ensureCashTables();
+  await ensureCashColumns();
+  await ensureCashIndexes();
 }

@@ -10,6 +10,7 @@ import {
 import { useCallback } from 'react';
 import { Home } from './pages/Home';
 import type {
+  CashRouteState,
   ProductRouteState,
   SalesRouteState,
 } from './components/layout/MainLayout';
@@ -30,11 +31,21 @@ interface SalesRouterSearchState {
   soldDate?: string;
 }
 
+interface CashRouterSearchState {
+  page?: number;
+  from?: string;
+  to?: string;
+}
+
 const defaultProductsSearch: ProductRouterSearchState = {
   page: 1,
 };
 
 const defaultSalesSearch: SalesRouterSearchState = {
+  page: 1,
+};
+
+const defaultCashSearch: CashRouterSearchState = {
   page: 1,
 };
 
@@ -58,6 +69,12 @@ function parseOptionalText(rawValue: unknown): string | undefined {
 function parseStatus(rawValue: unknown): 'true' | 'false' | undefined {
   if (rawValue === 'true' || rawValue === 'false') return rawValue;
   return undefined;
+}
+
+function parseDate(rawValue: unknown): string | undefined {
+  const value = parseOptionalText(rawValue);
+  if (!value) return undefined;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
 }
 
 function normalizeProductsSearch(
@@ -86,6 +103,14 @@ function normalizeSalesSearch(search: Record<string, unknown>): SalesRouterSearc
     q: parseOptionalText(search.q),
     paymentMethod,
     soldDate,
+  };
+}
+
+function normalizeCashSearch(search: Record<string, unknown>): CashRouterSearchState {
+  return {
+    page: parsePage(search.page),
+    from: parseDate(search.from),
+    to: parseDate(search.to),
   };
 }
 
@@ -120,7 +145,15 @@ const salesRoute = createRoute({
   component: SalesView,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, productsRoute, salesRoute]);
+const cashRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'caja',
+  validateSearch: (search: Record<string, unknown>): CashRouterSearchState =>
+    normalizeCashSearch(search),
+  component: CashView,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, productsRoute, salesRoute, cashRoute]);
 
 export const router = createRouter({ routeTree });
 
@@ -142,6 +175,12 @@ function ProductsView() {
     q: '',
     paymentMethod: '',
     soldDate: '',
+  };
+
+  const cashRouteState: CashRouteState = {
+    page: 1,
+    from: '',
+    to: '',
   };
 
   const handleProductRouteStateChange = useCallback(
@@ -187,11 +226,19 @@ function ProductsView() {
       onProductRouteStateChange={handleProductRouteStateChange}
       salesRouteState={salesRouteState}
       onSalesRouteStateChange={() => {}}
+      cashRouteState={cashRouteState}
+      onCashRouteStateChange={() => {}}
       onGoToProducts={() => {}}
       onGoToSales={() => {
         void navigate({
           to: '/ventas',
           search: defaultSalesSearch,
+        });
+      }}
+      onGoToCash={() => {
+        void navigate({
+          to: '/caja',
+          search: defaultCashSearch,
         });
       }}
     />
@@ -216,6 +263,12 @@ function SalesView() {
     category: '',
     status: '',
     codebar: '',
+  };
+
+  const cashRouteState: CashRouteState = {
+    page: 1,
+    from: '',
+    to: '',
   };
 
   const handleSalesRouteStateChange = useCallback(
@@ -253,6 +306,8 @@ function SalesView() {
       onProductRouteStateChange={() => {}}
       salesRouteState={salesRouteState}
       onSalesRouteStateChange={handleSalesRouteStateChange}
+      cashRouteState={cashRouteState}
+      onCashRouteStateChange={() => {}}
       onGoToProducts={() => {
         void navigate({
           to: '/productos',
@@ -260,6 +315,88 @@ function SalesView() {
         });
       }}
       onGoToSales={() => {}}
+      onGoToCash={() => {
+        void navigate({
+          to: '/caja',
+          search: defaultCashSearch,
+        });
+      }}
+    />
+  );
+}
+
+function CashView() {
+  const navigate = useNavigate({ from: cashRoute.fullPath });
+  const search = cashRoute.useSearch();
+
+  const cashRouteState: CashRouteState = {
+    page: parsePage(search.page),
+    from: search.from ?? '',
+    to: search.to ?? '',
+  };
+
+  const productRouteState: ProductRouteState = {
+    page: 1,
+    search: '',
+    brand: '',
+    category: '',
+    status: '',
+    codebar: '',
+  };
+
+  const salesRouteState: SalesRouteState = {
+    page: 1,
+    q: '',
+    paymentMethod: '',
+    soldDate: '',
+  };
+
+  const handleCashRouteStateChange = useCallback(
+    (next: Partial<CashRouteState>) => {
+      void navigate({
+        to: '/caja',
+        search: {
+          page:
+            next.page === undefined
+              ? cashRouteState.page
+              : Math.max(1, Math.floor(next.page)),
+          from:
+            next.from === undefined
+              ? parseDate(cashRouteState.from)
+              : parseDate(next.from),
+          to:
+            next.to === undefined
+              ? parseDate(cashRouteState.to)
+              : parseDate(next.to),
+        },
+        replace: true,
+      });
+    },
+    [cashRouteState, navigate],
+  );
+
+  return (
+    <Home
+      section="cash"
+      productRouteState={productRouteState}
+      onProductRouteStateChange={() => {}}
+      salesRouteState={salesRouteState}
+      onSalesRouteStateChange={() => {}}
+      cashRouteState={cashRouteState}
+      onCashRouteStateChange={handleCashRouteStateChange}
+      onGoToProducts={() => {
+        void navigate({
+          to: '/productos',
+          search: defaultProductsSearch,
+        });
+      }}
+      onGoToSales={() => {
+        void navigate({
+          to: '/ventas',
+          search: defaultSalesSearch,
+        });
+      }}
+      onGoToCash={() => {}}
     />
   );
 }

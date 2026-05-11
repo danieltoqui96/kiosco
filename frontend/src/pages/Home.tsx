@@ -1,6 +1,7 @@
 import {
   type AppSection,
   MainLayout,
+  type CashRouteState,
   type ProductRouteState,
   type SalesRouteState,
 } from '../components/layout/MainLayout';
@@ -12,8 +13,11 @@ interface HomeProps {
   onProductRouteStateChange: (next: Partial<ProductRouteState>) => void;
   salesRouteState: SalesRouteState;
   onSalesRouteStateChange: (next: Partial<SalesRouteState>) => void;
+  cashRouteState: CashRouteState;
+  onCashRouteStateChange: (next: Partial<CashRouteState>) => void;
   onGoToProducts: () => void;
   onGoToSales: () => void;
+  onGoToCash: () => void;
 }
 
 export const Home = ({
@@ -22,8 +26,11 @@ export const Home = ({
   onProductRouteStateChange,
   salesRouteState,
   onSalesRouteStateChange,
+  cashRouteState,
+  onCashRouteStateChange,
   onGoToProducts,
   onGoToSales,
+  onGoToCash,
 }: HomeProps) => {
   return (
     <div className="app-layout">
@@ -31,6 +38,7 @@ export const Home = ({
         activeSection={section}
         onGoToProducts={onGoToProducts}
         onGoToSales={onGoToSales}
+        onGoToCash={onGoToCash}
       />
       <MainLayout
         section={section}
@@ -38,6 +46,8 @@ export const Home = ({
         onProductRouteStateChange={onProductRouteStateChange}
         salesRouteState={salesRouteState}
         onSalesRouteStateChange={onSalesRouteStateChange}
+        cashRouteState={cashRouteState}
+        onCashRouteStateChange={onCashRouteStateChange}
       />
     </div>
   );

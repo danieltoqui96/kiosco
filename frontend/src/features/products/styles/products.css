@@ -353,3 +353,120 @@
   align-items: center;
   justify-content: center;
 }
+
+.cash-filters-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.cash-summary-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cash-summary-pill {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  background-color: var(--bg-card);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+
+.cash-summary-pill > strong {
+  font-size: 0.875rem;
+}
+
+.cash-icon-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cash-icon-badge--in {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.cash-icon-badge--out {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.cash-icon-badge--type {
+  background-color: var(--color-gray-100);
+  color: var(--text-secondary);
+}
+
+.cash-detail-overview {
+  border: 1px solid var(--border-light);
+  background: var(--bg-hover);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cash-detail-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.cash-detail-day {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.cash-mini-metrics {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cash-mini-pill {
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--color-gray-100);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.cash-balance-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cash-balance-item {
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cash-balance-label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.cash-balance-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
