@@ -22,6 +22,7 @@ export interface Product {
   purchasePrice: number;
   stock: number;
   isActive: boolean;
+  expirationDate: string | null;
 }
 
 export interface Brand {
@@ -45,6 +46,7 @@ export interface ProductFormValues {
   purchasePrice: number;
   stock: number;
   isActive: boolean;
+  expirationDate: string | null;
 }
 
 export interface ProductQueryParams {
@@ -81,6 +83,9 @@ export interface ProductUiDerived {
   stockStatus: 'ok' | 'low' | 'zero';
   statusLabel: 'Activo' | 'Inactivo';
   stockAlertLabel: 'Stock bajo' | 'Sin stock' | null;
+  expirationStatus: 'none' | 'ok' | 'soon' | 'expired';
+  expirationLabel: string;
+  expirationAlertLabel: 'Por vencer' | 'Vencido' | null;
 }
 
 export interface ProductSelectionState {

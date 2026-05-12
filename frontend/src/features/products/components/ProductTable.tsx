@@ -1,4 +1,4 @@
-import { formatCurrency, getStatusBadgeClass } from '../presentation.utils';
+import { formatCurrency } from '../presentation.utils';
 import type { ProductViewModel } from '../types';
 
 interface ProductTableProps {
@@ -56,6 +56,7 @@ export const ProductTable = ({
           <col className="products-table__category" />
           <col className="products-table__price" />
           <col className="products-table__stock" />
+          <col className="products-table__expiration" />
           <col className="products-table__state" />
         </colgroup>
         <thead className="table-header">
@@ -67,10 +68,13 @@ export const ProductTable = ({
             <th className="table-cell table-cell--header table-cell--right">
               Precio
             </th>
-            <th className="table-cell table-cell--header table-cell--right">
+            <th className="table-cell table-cell--header table-cell--center">
               Stock
             </th>
-            <th className="table-cell table-cell--header">Estado</th>
+            <th className="table-cell table-cell--header table-cell--right">
+              Vence
+            </th>
+            <th className="table-cell table-cell--header table-cell--center">Est.</th>
           </tr>
         </thead>
 
@@ -133,27 +137,32 @@ export const ProductTable = ({
                     {formatCurrency(product.salePrice)}
                   </td>
 
-                  <td className="table-cell table-cell--right table-cell--number">
-                    <span className="products-table__stock-stack">
+                  <td className="table-cell table-cell--center table-cell--number">
+                    <span
+                      className={`products-table__stock-value products-table__stock-value--${product.stockStatus}`}
+                      title={product.stockAlertLabel ?? undefined}
+                    >
                       <strong>{product.stock}</strong>
-                      {product.stockAlertLabel ? (
-                        <span
-                          className={`products-table__stock-dot products-table__stock-dot--${product.stockStatus}`}
-                          title={product.stockAlertLabel}
-                          aria-label={product.stockAlertLabel}
-                        >
-                          !
-                        </span>
-                      ) : (
-                        <span className="products-table__stock-dot products-table__stock-dot--empty" aria-hidden="true" />
-                      )}
                     </span>
                   </td>
 
-                  <td className="table-cell">
-                    <span className={getStatusBadgeClass(product.statusLabel)}>
-                      {product.statusLabel}
+                  <td className="table-cell table-cell--right table-cell--number">
+                    <span
+                      className={`products-table__expiration-value products-table__expiration-value--${product.expirationStatus}`}
+                      title={product.expirationAlertLabel ?? undefined}
+                    >
+                      <strong>{product.expirationLabel}</strong>
                     </span>
+                  </td>
+
+                  <td className="table-cell table-cell--center">
+                    <span
+                      className={`products-table__status-dot products-table__status-dot--${
+                        product.isActive ? 'active' : 'inactive'
+                      }`}
+                      title={product.statusLabel}
+                      aria-label={product.statusLabel}
+                    />
                   </td>
                 </tr>
               );

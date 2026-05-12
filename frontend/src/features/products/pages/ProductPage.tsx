@@ -42,6 +42,9 @@ function buildUpdatePayload(
   }
   if (nextValues.stock !== currentValues.stock) payload.stock = nextValues.stock;
   if (nextValues.isActive !== currentValues.isActive) payload.isActive = nextValues.isActive;
+  if (nextValues.expirationDate !== currentValues.expirationDate) {
+    payload.expirationDate = nextValues.expirationDate;
+  }
 
   return payload;
 }
@@ -439,6 +442,7 @@ export const ProductPage = ({ routeState, onRouteStateChange }: ProductPageProps
       purchasePrice: product.purchasePrice,
       stock: product.stock,
       isActive: product.isActive,
+      expirationDate: product.expirationDate,
     });
 
     setErrorMessage(null);

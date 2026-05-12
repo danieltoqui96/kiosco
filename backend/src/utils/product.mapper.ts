@@ -4,6 +4,12 @@ import type {
   ProductWriteDB,
 } from '../products/products.types.js';
 
+function formatDateOnly(value: string | Date | null): string | null {
+  if (value === null) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
 export function mapProductDBToProduct(product: ProductReadDB): Product {
   return {
     id: product.id,
@@ -15,6 +21,7 @@ export function mapProductDBToProduct(product: ProductReadDB): Product {
     purchasePrice: product.purchase_price,
     stock: product.stock,
     isActive: Boolean(product.is_active),
+    expirationDate: formatDateOnly(product.expiration_date),
   };
 }
 
@@ -28,5 +35,6 @@ export function mapProductToProductDB(
     purchase_price: product.purchasePrice,
     stock: product.stock,
     is_active: product.isActive,
+    expiration_date: product.expirationDate,
   };
 }

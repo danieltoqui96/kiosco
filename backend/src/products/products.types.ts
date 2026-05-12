@@ -10,6 +10,7 @@ export interface ProductReadDB extends RowDataPacket {
   purchase_price: number;
   stock: number;
   is_active: boolean;
+  expiration_date: string | Date | null;
 }
 
 export interface ProductWriteDB extends RowDataPacket {
@@ -22,4 +23,5 @@ export interface ProductWriteDB extends RowDataPacket {
   purchase_price: number;
   stock: number;
   is_active: boolean;
+  expiration_date: string | Date | null;
 }

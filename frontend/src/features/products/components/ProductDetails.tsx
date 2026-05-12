@@ -1,4 +1,4 @@
-import { formatCurrency, getStatusBadgeClass } from '../presentation.utils';
+import { formatCurrency, formatDate, getStatusBadgeClass } from '../presentation.utils';
 import type { ProductViewModel } from '../types';
 
 interface ProductDetailsProps {
@@ -93,6 +93,10 @@ export const ProductDetails = ({
                   <dt className="info-label">Marca</dt>
                   <dd className="info-value">{product.brand}</dd>
                 </div>
+                <div className="info-row">
+                  <dt className="info-label">Fecha de vencimiento</dt>
+                  <dd className="info-value">{formatDate(product.expirationDate)}</dd>
+                </div>
               </dl>
             </div>
 
@@ -131,6 +135,18 @@ export const ProductDetails = ({
                     <dd className="info-value">
                       <span className={`stock-indicator stock-indicator--${product.stockStatus}`}>
                         {product.stockAlertLabel}
+                      </span>
+                    </dd>
+                  </div>
+                ) : null}
+                {product.expirationAlertLabel ? (
+                  <div className="info-row">
+                    <dt className="info-label">Alerta vencimiento</dt>
+                    <dd className="info-value">
+                      <span
+                        className={`expiration-indicator expiration-indicator--${product.expirationStatus}`}
+                      >
+                        {product.expirationAlertLabel}
                       </span>
                     </dd>
                   </div>

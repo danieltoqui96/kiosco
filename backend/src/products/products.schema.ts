@@ -5,6 +5,17 @@ const uppercaseTextSchema = z
   .min(1)
   .transform((value) => value.trim().toUpperCase());
 
+const optionalDateSchema = z.preprocess(
+  (value) => {
+    if (value === '' || value === null || value === undefined) return null;
+    return value;
+  },
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+);
+
 const baseCreateProductSchema = z.object({
   codebar: z.string().min(1),
   name: uppercaseTextSchema,
@@ -14,6 +25,7 @@ const baseCreateProductSchema = z.object({
   purchasePrice: z.number().int().nonnegative(),
   stock: z.number().int().nonnegative(),
   isActive: z.boolean(),
+  expirationDate: optionalDateSchema.optional(),
 });
 
 export const productSchema = z.object({
@@ -26,6 +38,7 @@ export const productSchema = z.object({
   purchasePrice: z.number().int().nonnegative(),
   stock: z.number().int().nonnegative(),
   isActive: z.boolean(),
+  expirationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
 });
 export const createProductSchema = baseCreateProductSchema;
 export const updateProductSchema = baseCreateProductSchema.partial();

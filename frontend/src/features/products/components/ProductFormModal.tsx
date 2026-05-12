@@ -42,6 +42,7 @@ const DEFAULT_VALUES: ProductFormValues = {
   purchasePrice: 0,
   stock: 0,
   isActive: true,
+  expirationDate: null,
 };
 
 function toNumericTextValues(values: ProductFormValues): ProductFormTextValues {
@@ -82,6 +83,7 @@ function sanitizeValues(
     name: values.name.trim().toUpperCase(),
     brand: values.brand.trim().toUpperCase(),
     category: values.category.trim().toUpperCase(),
+    expirationDate: values.expirationDate || null,
   };
 }
 
@@ -254,6 +256,24 @@ export const ProductFormModal = ({
                   {errors.category ? (
                     <span className="form-error">{errors.category}</span>
                   ) : null}
+                </div>
+
+                <div className="form-field">
+                  <label className="form-label" htmlFor="product-expiration-date">
+                    Fecha de vencimiento
+                  </label>
+                  <input
+                    id="product-expiration-date"
+                    type="date"
+                    className="form-input"
+                    value={values.expirationDate ?? ''}
+                    onChange={(event) =>
+                      setValues((prev) => ({
+                        ...prev,
+                        expirationDate: event.target.value || null,
+                      }))
+                    }
+                  />
                 </div>
               </div>
             </fieldset>

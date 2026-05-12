@@ -118,6 +118,19 @@ async function ensureSalesTables(): Promise<void> {
   );
 }
 
+async function ensureProductsColumns(): Promise<void> {
+  if (!(await hasTable('products'))) return;
+
+  if (!(await hasColumn('products', 'expiration_date'))) {
+    await pool.query(
+      `
+        ALTER TABLE products
+        ADD COLUMN expiration_date DATE NULL
+      `,
+    );
+  }
+}
+
 async function ensureSalesCompatibilityColumns(): Promise<void> {
   if (!(await hasColumn('sales', 'created_at'))) {
     await pool.query(
@@ -419,6 +432,7 @@ async function ensureCashIndexes(): Promise<void> {
 }
 
 export async function ensureAppSchema(): Promise<void> {
+  await ensureProductsColumns();
   await ensureSalesTables();
   await ensureSalesCompatibilityColumns();
   await ensureSalesIndexes();

@@ -129,7 +129,8 @@ export class ProductsModel {
           p.sale_price,
           p.purchase_price,
           p.stock,
-          p.is_active
+          p.is_active,
+          p.expiration_date
         FROM products p
         INNER JOIN brands b ON b.id = p.brand_id
         INNER JOIN categories c ON c.id = p.category_id
@@ -161,7 +162,8 @@ export class ProductsModel {
           p.sale_price,
           p.purchase_price,
           p.stock,
-          p.is_active
+          p.is_active,
+          p.expiration_date
         FROM products p
         INNER JOIN brands b ON b.id = p.brand_id
         INNER JOIN categories c ON c.id = p.category_id
@@ -191,6 +193,7 @@ export class ProductsModel {
           purchase_price: data.purchasePrice,
           stock: data.stock,
           is_active: data.isActive,
+          expiration_date: data.expirationDate ?? null,
         },
       ],
     );
@@ -286,7 +289,8 @@ export class ProductsModel {
           p.sale_price,
           p.purchase_price,
           p.stock,
-          p.is_active
+          p.is_active,
+          p.expiration_date
         FROM products p
         INNER JOIN brands b ON b.id = p.brand_id
         INNER JOIN categories c ON c.id = p.category_id

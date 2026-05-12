@@ -12,6 +12,7 @@ const baseProducts: Product[] = [
     purchasePrice: 620000,
     stock: 45,
     isActive: true,
+    expirationDate: null,
   },
   {
     id: 2,
@@ -23,6 +24,7 @@ const baseProducts: Product[] = [
     purchasePrice: 1210000,
     stock: 3,
     isActive: true,
+    expirationDate: null,
   },
   {
     id: 3,
@@ -34,6 +36,7 @@ const baseProducts: Product[] = [
     purchasePrice: 350000,
     stock: 28,
     isActive: true,
+    expirationDate: '2026-05-18',
   },
   {
     id: 4,
@@ -45,6 +48,7 @@ const baseProducts: Product[] = [
     purchasePrice: 520000,
     stock: 12,
     isActive: true,
+    expirationDate: null,
   },
   {
     id: 5,
@@ -56,6 +60,7 @@ const baseProducts: Product[] = [
     purchasePrice: 180000,
     stock: 0,
     isActive: false,
+    expirationDate: '2026-05-01',
   },
   {
     id: 6,
@@ -67,6 +72,7 @@ const baseProducts: Product[] = [
     purchasePrice: 4300,
     stock: 120,
     isActive: true,
+    expirationDate: '2026-12-31',
   },
 ];
 
