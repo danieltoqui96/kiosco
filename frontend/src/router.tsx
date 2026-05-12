@@ -7,7 +7,7 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/react-router';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Home } from './pages/Home';
 import type {
   CashRouteState,
@@ -161,14 +161,17 @@ function ProductsView() {
   const navigate = useNavigate({ from: productsRoute.fullPath });
   const search = productsRoute.useSearch();
 
-  const productRouteState: ProductRouteState = {
-    page: parsePage(search.page),
-    search: search.search ?? '',
-    brand: search.brand ?? '',
-    category: search.category ?? '',
-    status: search.status ?? '',
-    codebar: search.codebar ?? '',
-  };
+  const productRouteState: ProductRouteState = useMemo(
+    () => ({
+      page: parsePage(search.page),
+      search: search.search ?? '',
+      brand: search.brand ?? '',
+      category: search.category ?? '',
+      status: search.status ?? '',
+      codebar: search.codebar ?? '',
+    }),
+    [search.brand, search.category, search.codebar, search.page, search.search, search.status],
+  );
 
   const salesRouteState: SalesRouteState = {
     page: 1,
@@ -249,12 +252,15 @@ function SalesView() {
   const navigate = useNavigate({ from: salesRoute.fullPath });
   const search = salesRoute.useSearch();
 
-  const salesRouteState: SalesRouteState = {
-    page: parsePage(search.page),
-    q: search.q ?? '',
-    paymentMethod: search.paymentMethod ?? '',
-    soldDate: search.soldDate ?? '',
-  };
+  const salesRouteState: SalesRouteState = useMemo(
+    () => ({
+      page: parsePage(search.page),
+      q: search.q ?? '',
+      paymentMethod: search.paymentMethod ?? '',
+      soldDate: search.soldDate ?? '',
+    }),
+    [search.page, search.paymentMethod, search.q, search.soldDate],
+  );
 
   const productRouteState: ProductRouteState = {
     page: 1,
@@ -329,11 +335,14 @@ function CashView() {
   const navigate = useNavigate({ from: cashRoute.fullPath });
   const search = cashRoute.useSearch();
 
-  const cashRouteState: CashRouteState = {
-    page: parsePage(search.page),
-    from: search.from ?? '',
-    to: search.to ?? '',
-  };
+  const cashRouteState: CashRouteState = useMemo(
+    () => ({
+      page: parsePage(search.page),
+      from: search.from ?? '',
+      to: search.to ?? '',
+    }),
+    [search.from, search.page, search.to],
+  );
 
   const productRouteState: ProductRouteState = {
     page: 1,

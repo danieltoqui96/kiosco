@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -127,14 +126,6 @@ export const ProductFormModal = ({
     toNumericTextValues(getInitialFormValues(initialValues)),
   );
   const [errors, setErrors] = useState<ProductFormErrors>({});
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const nextValues = getInitialFormValues(initialValues);
-    setValues(nextValues);
-    setNumericTexts(toNumericTextValues(nextValues));
-    setErrors({});
-  }, [initialValues, isOpen]);
 
   const title = useMemo(
     () => (mode === 'create' ? 'Agregar producto' : 'Editar producto'),
