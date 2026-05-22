@@ -1,4 +1,4 @@
-import type { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from '../db/sqlite.js';
 
 export interface ProductReadDB extends RowDataPacket {
   id: number;

@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import {
   Outlet,
+  createHashHistory,
   createRootRoute,
   createRoute,
   createRouter,
@@ -154,8 +155,9 @@ const cashRoute = createRoute({
 });
 
 const routeTree = rootRoute.addChildren([indexRoute, productsRoute, salesRoute, cashRoute]);
+const history = createHashHistory();
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({ routeTree, history });
 
 function ProductsView() {
   const navigate = useNavigate({ from: productsRoute.fullPath });

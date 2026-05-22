@@ -1,5 +1,5 @@
-import type { ResultSetHeader, RowDataPacket } from 'mysql2';
-import { pool } from '../db/mysql.js';
+import type { ResultSetHeader, RowDataPacket } from '../db/sqlite.js';
+import { pool } from '../db/sqlite.js';
 import type { BrandDB } from './brands.types.js';
 import type { Brand, CreateBrand, UpdateBrand } from './brands.schema.js';
 import type {

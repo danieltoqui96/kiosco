@@ -1,5 +1,5 @@
-import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
-import { pool } from '../db/mysql.js';
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from '../db/sqlite.js';
+import { pool } from '../db/sqlite.js';
 import type { PaginationParams } from '../utils/pagination.utils.js';
 import type {
   CreateCashDepositInput,
@@ -340,9 +340,10 @@ export class CashModel {
         `
           INSERT INTO cash_daily_balances (day_date, initial_cash, initial_card)
           VALUES (?, ?, ?)
-          ON DUPLICATE KEY UPDATE
-            initial_cash = VALUES(initial_cash),
-            initial_card = VALUES(initial_card)
+          ON CONFLICT(day_date) DO UPDATE SET
+            initial_cash = excluded.initial_cash,
+            initial_card = excluded.initial_card,
+            updated_at = CURRENT_TIMESTAMP
         `,
         [day, data.cash, data.card],
       );
@@ -379,7 +380,7 @@ export class CashModel {
         `
           INSERT INTO cash_daily_balances (day_date, initial_cash, initial_card)
           VALUES (?, 0, 0)
-          ON DUPLICATE KEY UPDATE day_date = VALUES(day_date)
+          ON CONFLICT(day_date) DO NOTHING
         `,
         [day],
       );
@@ -441,7 +442,7 @@ export class CashModel {
         `
           INSERT INTO cash_daily_balances (day_date, initial_cash, initial_card)
           VALUES (?, 0, 0)
-          ON DUPLICATE KEY UPDATE day_date = VALUES(day_date)
+          ON CONFLICT(day_date) DO NOTHING
         `,
         [day],
       );
@@ -506,7 +507,6 @@ export class CashModel {
           FROM cash_withdrawals cw
           WHERE cw.id = ?
             AND cw.day_date = ?
-          FOR UPDATE
         `,
         [withdrawalId, day],
       );
@@ -530,7 +530,7 @@ export class CashModel {
         `
           UPDATE cash_withdrawals
           SET
-            voided_at = NOW(),
+            voided_at = CURRENT_TIMESTAMP,
             voided_reason = ?
           WHERE id = ?
         `,

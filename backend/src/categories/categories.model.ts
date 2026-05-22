@@ -1,5 +1,5 @@
-import type { ResultSetHeader, RowDataPacket } from 'mysql2';
-import { pool } from '../db/mysql.js';
+import type { ResultSetHeader, RowDataPacket } from '../db/sqlite.js';
+import { pool } from '../db/sqlite.js';
 import type { CategoryDB } from './categories.types.js';
 import type {
   Category,

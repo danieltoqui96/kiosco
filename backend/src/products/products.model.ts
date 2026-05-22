@@ -1,5 +1,5 @@
-import { pool } from '../db/mysql.js';
-import type { ResultSetHeader, RowDataPacket } from 'mysql2';
+import { pool } from '../db/sqlite.js';
+import type { ResultSetHeader, RowDataPacket } from '../db/sqlite.js';
 import { BrandsModel } from '../brands/brands.model.js';
 import { CategoriesModel } from '../categories/categories.model.js';
 import type {
@@ -37,19 +37,19 @@ export class ProductsModel {
   private static async cleanupOrphanCatalogs(): Promise<void> {
     await pool.query(
       `
-        DELETE b
-        FROM brands b
-        LEFT JOIN products p ON p.brand_id = b.id
-        WHERE p.id IS NULL
+        DELETE FROM brands
+        WHERE NOT EXISTS (
+          SELECT 1 FROM products p WHERE p.brand_id = brands.id
+        )
       `,
     );
 
     await pool.query(
       `
-        DELETE c
-        FROM categories c
-        LEFT JOIN products p ON p.category_id = c.id
-        WHERE p.id IS NULL
+        DELETE FROM categories
+        WHERE NOT EXISTS (
+          SELECT 1 FROM products p WHERE p.category_id = categories.id
+        )
       `,
     );
   }
@@ -182,19 +182,30 @@ export class ProductsModel {
     const category = await CategoriesModel.getOrCreateCategory(data.category);
 
     const [result] = await pool.query<ResultSetHeader>(
-      'INSERT INTO products SET ?',
+      `
+        INSERT INTO products (
+          codebar,
+          name,
+          brand_id,
+          category_id,
+          sale_price,
+          purchase_price,
+          stock,
+          is_active,
+          expiration_date
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
       [
-        {
-          codebar: data.codebar,
-          name: data.name,
-          brand_id: brand.id,
-          category_id: category.id,
-          sale_price: data.salePrice,
-          purchase_price: data.purchasePrice,
-          stock: data.stock,
-          is_active: data.isActive,
-          expiration_date: data.expirationDate ?? null,
-        },
+        data.codebar,
+        data.name,
+        brand.id,
+        category.id,
+        data.salePrice,
+        data.purchasePrice,
+        data.stock,
+        data.isActive,
+        data.expirationDate ?? null,
       ],
     );
 
@@ -230,9 +241,13 @@ export class ProductsModel {
       cleanData.category_id = category.id;
     }
 
+    const entries = Object.entries(cleanData);
+    if (entries.length === 0) return beforeUpdate;
+
+    const setSql = entries.map(([key]) => `${key} = ?`).join(', ');
     const [result] = await pool.query<ResultSetHeader>(
-      'UPDATE products SET ? WHERE id = ?',
-      [cleanData, id],
+      `UPDATE products SET ${setSql} WHERE id = ?`,
+      [...entries.map(([, value]) => value), id],
     );
 
     if (result.affectedRows === 0) return beforeUpdate;

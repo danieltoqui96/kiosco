@@ -1,5 +1,5 @@
-import type { ResultSetHeader, RowDataPacket } from 'mysql2';
-import { pool } from '../db/mysql.js';
+import type { ResultSetHeader, RowDataPacket } from '../db/sqlite.js';
+import { pool } from '../db/sqlite.js';
 import type {
   PaginatedResult,
   PaginationParams,
@@ -83,7 +83,7 @@ function buildSalesWhere(search?: string): {
 
   if (search) {
     const value = `%${search}%`;
-    andClauses.push('CAST(s.id AS CHAR) LIKE ?');
+    andClauses.push('CAST(s.id AS TEXT) LIKE ?');
     whereParams.push(value);
   }
 
@@ -262,8 +262,8 @@ export class SalesModel {
           s.id,
           s.sold_at AS created_at,
           COALESCE(s.payment_method, 'cash') AS payment_method,
-          CAST(s.total_sale AS SIGNED) AS total_amount,
-          CAST(s.items_count AS SIGNED) AS total_items
+          CAST(s.total_sale AS INTEGER) AS total_amount,
+          CAST(s.items_count AS INTEGER) AS total_items
         FROM sales s
         ${whereSql}
         ORDER BY s.id DESC
@@ -288,8 +288,8 @@ export class SalesModel {
           s.id,
           s.sold_at AS created_at,
           COALESCE(s.payment_method, 'cash') AS payment_method,
-          CAST(s.total_sale AS SIGNED) AS total_amount,
-          CAST(s.items_count AS SIGNED) AS total_items
+          CAST(s.total_sale AS INTEGER) AS total_amount,
+          CAST(s.items_count AS INTEGER) AS total_items
         FROM sales s
         WHERE s.id = ?
       `,
@@ -306,9 +306,9 @@ export class SalesModel {
           si.product_codebar,
           si.product_name,
           COALESCE(b.name, 'Sin marca') AS brand_name,
-          CAST(si.quantity AS SIGNED) AS quantity,
-          CAST(si.unit_sale_price AS SIGNED) AS unit_price,
-          CAST(si.line_sale_total AS SIGNED) AS subtotal
+          CAST(si.quantity AS INTEGER) AS quantity,
+          CAST(si.unit_sale_price AS INTEGER) AS unit_price,
+          CAST(si.line_sale_total AS INTEGER) AS subtotal
         FROM sale_items si
         LEFT JOIN products p ON p.id = si.product_id
         LEFT JOIN brands b ON b.id = p.brand_id
@@ -416,7 +416,6 @@ export class SalesModel {
           FROM products p
           INNER JOIN brands b ON b.id = p.brand_id
           WHERE p.id IN (${placeholders})
-          FOR UPDATE
         `,
         productIds,
       );
@@ -510,7 +509,6 @@ export class SalesModel {
           SELECT id
           FROM sales
           WHERE id = ?
-          FOR UPDATE
         `,
         [id],
       );
@@ -558,7 +556,6 @@ export class SalesModel {
           FROM products p
           INNER JOIN brands b ON b.id = p.brand_id
           WHERE p.id IN (${placeholders})
-          FOR UPDATE
         `,
         productIds,
       );
@@ -658,7 +655,6 @@ export class SalesModel {
           SELECT id
           FROM sales
           WHERE id = ?
-          FOR UPDATE
         `,
         [id],
       );
@@ -700,7 +696,6 @@ export class SalesModel {
             FROM products p
             INNER JOIN brands b ON b.id = p.brand_id
             WHERE p.id IN (${placeholders})
-            FOR UPDATE
           `,
           productIds,
         );

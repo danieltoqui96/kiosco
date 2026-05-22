@@ -23,5 +23,9 @@ async function startServer() {
 
 void startServer().catch((error) => {
   console.error('Failed to start server:', error);
+  if (process.env.KIOSCO_ELECTRON === '1') {
+    throw error;
+  }
+
   process.exit(1);
 });

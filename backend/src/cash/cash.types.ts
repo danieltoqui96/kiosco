@@ -1,4 +1,4 @@
-import type { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from '../db/sqlite.js';
 
 export interface CashDayRowDB extends RowDataPacket {
   day_date: string | Date;
